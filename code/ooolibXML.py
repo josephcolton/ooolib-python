@@ -6,6 +6,57 @@
 # You can contact me by email at josephcolton@gmail.com                         #
 #################################################################################
 
+############################
+# ooolib-python XML Prolog #
+############################
+class Prolog:
+    """Prolog - XML prolog element
+
+    Create a special XML element prolog
+    """
+    def __init__(self, name, default=True):
+        # Parameters
+        self.name = name
+        # Internal variables
+        self.attributes = None
+        # Default prolog
+        self.initDefault()
+
+    def initDefault(self):
+        self.setAttribute("version", "1.0")
+        self.setAttribute("encoding", "UTF-8")
+
+    def setAttribute(self, name, value):
+        # Mark element as having attributes
+        if (self.attributes == None):
+            self.attributes = {}
+        # Add attribute to attributes dictionary
+        self.attributes[name] = value
+
+    def __attributeString(self):
+        attributeStr = ""
+        # No attrinbutes
+        if (self.attributes == None):
+            return attributeStr
+        # Has attributes
+        for name in self.attributes:
+            value = self.attributes[name]
+            attributeStr += " %s=\"%s\"" % (name, value)
+        # Return attribute string
+        return attributeStr
+
+    def toString(self, indent=False):
+        # Get attribute string
+        attributeStr = self.__attributeString()
+
+        # Create XML string
+        xmlString = "<?%s%s?>\n" % (self.name, attributeStr)
+        # Return string
+        return xmlString
+
+#############################
+# ooolib-python XML Element #
+#############################
 class Element:
     """Element - XML element creation
 
@@ -29,7 +80,7 @@ class Element:
         if (name == "indentCharNum"): self.indentCharNum = int(value)
         if (name == "indentEndline"): self.indentEndline = str(value)
 
-    def addAttribute(self, name, value):
+    def setAttribute(self, name, value):
         # Mark element as having attributes
         if (self.attributes == None):
             self.attributes = {}
@@ -102,27 +153,34 @@ class Element:
 # Execute to Test #
 ###################
 if __name__ == "__main__":
+    # XML Prolog
+    p = Prolog("xml")
+
     # Main Element
     x = Element("element")
-    x.addAttribute("attrib1", 1)
-    x.addAttribute("attrib2", "xyz")
+    x.setAttribute("attrib1", 1)
+    x.setAttribute("attrib2", "xyz")
     # Child 1
     c1 = Element("child1", "Some text")
-    c1.addAttribute("attrib3", "123")
+    c1.setAttribute("attrib3", "123")
     x.addChild(c1)
     # Child 2
     c2 = Element("child2")
-    c2.addAttribute("attrib4", "abc")
+    c2.setAttribute("attrib4", "abc")
     x.addChild(c2)
     # Child 3
     c3 = Element("child3")
     x.addChild(c3)
     # Get the resulting string
+    string0 = p.toString()
     string1 = x.toString(indent=True)
     string2 = x.toString()
 
-    print("With Indentation:")
+    print("XML prolog:")
+    print(string0)
+
+    print("XML document with indentation:")
     print(string1)
 
-    print("Without Indentation:")    
+    print("XML document without indentation:")
     print(string2)
