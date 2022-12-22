@@ -26,12 +26,42 @@ class Prolog:
         self.setAttribute("version", "1.0")
         self.setAttribute("encoding", "UTF-8")
 
+    ###########
+    # Element #
+    ###########
+    def getElementName(self):
+        return self.name
+
+    def setElementName(self, name):
+        self.name = name
+
+    ##############
+    # Attributes #
+    ##############
     def setAttribute(self, name, value):
         # Mark element as having attributes
         if (self.attributes == None):
             self.attributes = {}
         # Add attribute to attributes dictionary
         self.attributes[name] = value
+
+    def getAttribute(self, name, default=None):
+        # Make sure we have attributes
+        if (self.attributes == None): return default
+        # Make sure we have this attribute
+        if name in self.attributes:
+            return self.attributes[name]
+        # Return default value
+        return default
+
+    def removeAttribute(self, name, default=None):
+        # Make sure we have attributes
+        if (self.attributes == None): return default
+        # Make sure we have this attribute
+        if name in self.attributes:
+            return self.attributes.pop(name)
+        # Return default value
+        return default
 
     def __attributeString(self):
         attributeStr = ""
@@ -45,6 +75,9 @@ class Prolog:
         # Return attribute string
         return attributeStr
 
+    #####################
+    # String Conversion #
+    #####################
     def toString(self, indent=False):
         # Get attribute string
         attributeStr = self.__attributeString()
@@ -80,6 +113,32 @@ class Element:
         if (name == "indentCharNum"): self.indentCharNum = int(value)
         if (name == "indentEndline"): self.indentEndline = str(value)
 
+    ###########
+    # Element #
+    ###########
+    def getElementName(self):
+        return self.name
+
+    def setElementName(self, name):
+        self.name = name
+
+    ########
+    # Text #
+    ########
+    def setText(self, text):
+        self.text = text
+
+    def getText(self):
+        return self.text
+
+    def removeText(self):
+        text = self.text
+        self.text = None
+        return text
+
+    ##############
+    # Attributes #
+    ##############
     def setAttribute(self, name, value):
         # Mark element as having attributes
         if (self.attributes == None):
@@ -87,12 +146,23 @@ class Element:
         # Add attribute to attributes dictionary
         self.attributes[name] = value
 
-    def addChild(self, child):
-        # Mark element as having children
-        if (self.children == None):
-            self.children = []
-        # Add child to element
-        self.children.append(child)
+    def getAttribute(self, name, default=None):
+        # Make sure we have attributes
+        if (self.attributes == None): return default
+        # Make sure we have this attribute
+        if name in self.attributes:
+            return self.attributes[name]
+        # Return default value
+        return default
+
+    def removeAttribute(self, name, default=None):
+        # Make sure we have attributes
+        if (self.attributes == None): return default
+        # Make sure we have this attribute
+        if name in self.attributes:
+            return self.attributes.pop(name)
+        # Return default value
+        return default
 
     def __attributeString(self):
         attributeStr = ""
@@ -105,7 +175,38 @@ class Element:
             attributeStr += " %s=\"%s\"" % (name, value)
         # Return attribute string
         return attributeStr
-        
+
+    ############
+    # Children #
+    ############
+    def addChild(self, child):
+        # Mark element as having children
+        if (self.children == None):
+            self.children = []
+        # Add child to element
+        self.children.append(child)
+
+    def removeChild(self, child):
+        # Only remove children if they exist
+        if (self.children == None): return
+        # Try to remove child
+        self.children.remove(child)
+
+    def removeChildIndex(self, index):
+        # Only remove children if they exist
+        if (self.children == None): return
+        # Make sure index is an integer
+        index = int(index)
+        # Make index is valid
+        count = len(self.children)
+        if (index < -count): return # From back
+        if (index >= count): return # From front
+        # Remove the index
+        self.children.pop(index)
+
+    #####################
+    # String Conversion #
+    #####################
     def toString(self, indent=False, level=0):
         # Indentation formatting
         if (indent):
