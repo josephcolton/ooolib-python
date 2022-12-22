@@ -44,6 +44,8 @@ class Prolog:
             self.attributes = {}
         # Add attribute to attributes dictionary
         self.attributes[name] = value
+        # Return element for chaining
+        return self
 
     def getAttribute(self, name, default=None):
         # Make sure we have attributes
@@ -98,7 +100,7 @@ class Element:
     def __init__(self, name, text=None):
         # Default values
         self.indentChar = " "
-        self.indentCharNum = 2
+        self.indentCharNum = 1
         self.indentEndline = "\n"
         # Parameters
         self.name = name
@@ -145,6 +147,8 @@ class Element:
             self.attributes = {}
         # Add attribute to attributes dictionary
         self.attributes[name] = value
+        # Return element for chaining
+        return self
 
     def getAttribute(self, name, default=None):
         # Make sure we have attributes
@@ -210,6 +214,16 @@ class Element:
         # Return child
         return child
 
+    ##########################
+    # Special Style Children #
+    ##########################
+    def addStyle(self, styleName, styleFamily=None, parentStyleName=None):
+        child = self.addChild(Element("style:style"))
+        child.setAttribute("style:name", styleName)
+        if (styleFamily != None): child.setAttribute("style:family", styleFamily)
+        if (parentStyleName != None): child.setAttribute("style:parent-style-name", parentStyleName)
+        return child
+
     #####################
     # String Conversion #
     #####################
@@ -234,7 +248,7 @@ class Element:
         if (self.children == None):
             if (self.text == None):
                 # No children or text
-                xmlString += "%s<%s%s />%s" % (indentPre, self.name, attributeStr, indentPost)   
+                xmlString += "%s<%s%s/>%s" % (indentPre, self.name, attributeStr, indentPost)
             else:
                 # No children, but text
                 xmlString = "%s<%s%s>%s" % (indentPre, self.name, attributeStr, text)
@@ -250,8 +264,8 @@ class Element:
                 # Children and text (this is a mess)
                 xmlString = "%s<%s%s>%s" % (indentPre, self.name, attributeStr, text)
                 for child in self.children:
-                    xmlString += child.toString(indent, level+1)
-                xmlString += "%s</%s>%s" % (indentPre, self.name, indentPost)
+                    xmlString += child.toString(indent=False)
+                xmlString += "</%s>%s" % (self.name, indentPost)
         # Return string
         return xmlString
 
