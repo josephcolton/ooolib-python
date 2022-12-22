@@ -7,7 +7,7 @@
 #################################################################################
 
 # Import python modules
-import os
+import os, sys
 
 # Import ooolib-python modules
 import ooolibGlobal
@@ -65,6 +65,32 @@ class Writer:
 if __name__ == "__main__":
     # Make sure we can make simple documents
     os.makedirs("example", exist_ok=True)
-    # Generate an empty calc
+    #################################
+    # Example 1 - Blank Spreadsheet #
+    #################################
     calc = Calc()
-    calc.export("example/simple-calc.ods")
+    calc.export("example/example1-blank.ods")
+    ########################################
+    # Example 2 - Spreadsheet with numbers #
+    ########################################
+    calc = Calc()
+    for row in range(1, 5+1):
+        for col in range(1, 5+1):
+            value = row * col
+            calc.content.activeTable.setCellFloat(row, col, value)
+    calc.export("example/example2-numbers.ods")
+    #################################################
+    # Example 3 - Spreadsheet with text and numbers #
+    #################################################
+    calc = Calc()
+    # Row 1
+    calc.content.activeTable.setCellText(1, 1, "Year")
+    calc.content.activeTable.setCellText(1, 2, "Event")
+    # Row 2
+    calc.content.activeTable.setCellFloat(2, 1, 2000)
+    calc.content.activeTable.setCellText(2, 2, "Y2K Issues")
+    # Row 3
+    calc.content.activeTable.setCellFloat(3, 1, 2038)
+    calc.content.activeTable.setCellText(3, 2, "Epochalypse")
+    calc.export("example/example3-number_text.ods")
+

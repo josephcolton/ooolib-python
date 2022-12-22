@@ -224,6 +224,26 @@ class Element:
         if (parentStyleName != None): child.setAttribute("style:parent-style-name", parentStyleName)
         return child
 
+    ##########################
+    # Special Table Children #
+    ##########################
+    def addTableCellFloat(self, value):
+        child = self.addChild(Element("table:table-cell"))
+        child.setAttribute("office:value-type", "float")
+        child.setAttribute("office:value", value)
+        child.setAttribute("calcext:value-type", "float")
+        # Display text
+        child.addChild(Element("text:p", value))
+        return child
+
+    def addTableCellString(self, value):
+        child = self.addChild(Element("table:table-cell"))
+        child.setAttribute("office:value-type", "string")
+        child.setAttribute("calcext:value-type", "string")
+        # Display text
+        child.addChild(Element("text:p", value))
+        return child
+
     #####################
     # String Conversion #
     #####################
