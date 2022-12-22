@@ -185,12 +185,16 @@ class Element:
             self.children = []
         # Add child to element
         self.children.append(child)
+        # Return child
+        return child
 
     def removeChild(self, child):
         # Only remove children if they exist
         if (self.children == None): return
         # Try to remove child
         self.children.remove(child)
+        # Return child
+        return child
 
     def removeChildIndex(self, index):
         # Only remove children if they exist
@@ -202,7 +206,9 @@ class Element:
         if (index < -count): return # From back
         if (index >= count): return # From front
         # Remove the index
-        self.children.pop(index)
+        child = self.children.pop(index)
+        # Return child
+        return child
 
     #####################
     # String Conversion #
