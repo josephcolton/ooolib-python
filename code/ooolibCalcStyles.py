@@ -62,6 +62,16 @@ class Styles:
         font1.setAttribute("svg:font-family", "&apos;Liberation Sans&apos;")
         font1.setAttribute("style:font-family-generic", "swiss")
         font1.setAttribute("style:font-pitch", "variable")
+        font2 = officeFonts.addChild(ooolibXML.Element("style:font-face"))
+        font2.setAttribute("style:name", "Lucida Sans")
+        font2.setAttribute("svg:font-family", "&apos;Lucida Sans&apos;")
+        font2.setAttribute("style:font-family-generic", "system")
+        font2.setAttribute("style:font-pitch", "variable")
+        font3 = officeFonts.addChild(ooolibXML.Element("style:font-face"))
+        font3.setAttribute("style:name", "Microsoft YaHei")
+        font3.setAttribute("svg:font-family", "&apos;Microsoft YaHei&apos;")
+        font3.setAttribute("style:font-family-generic", "system")
+        font3.setAttribute("style:font-pitch", "variable")
 
         #################
         # Office Styles #
@@ -207,11 +217,6 @@ class Styles:
         # Office Automatic Styles #
         ###########################
         officeAutomaticStyles = self.documentStyles.addChild(ooolibXML.Element("office:automatic-styles"))
-        numberNumberStyle = officeAutomaticStyles.addChild(ooolibXML.Element("number:number-style")).setAttribute("style:name", "N2")
-        numberStyle = numberNumberStyle.addChild(ooolibXML.Element("number:number"))
-        numberStyle.setAttribute("number:decimal-places", "2")
-        numberStyle.setAttribute("number:min-decimal-places", "2")
-        numberStyle.setAttribute("number:min-integer-digits", "1")
         # Page Layout: Mpm1
         stylePageLayout1 = officeAutomaticStyles.addChild(ooolibXML.Element("style:page-layout")).setAttribute("style:name", "Mpm1")
         stylePageLayout1.addChild(ooolibXML.Element("style:page-layout-properties")).setAttribute("style:writing-mode", "lr-tb")

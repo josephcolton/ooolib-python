@@ -38,6 +38,9 @@ class Calc:
         pass
 
     def export(self, filename):
+        # Update statistics first
+        self.content.updateStats()
+        # Create file
         f = ooolibFile.SaveFile(filename)
         f.insertFileString("mimetype", "application/vnd.oasis.opendocument.spreadsheet")
         f.insertFileString("META-INF/manifest.xml", self.manifest.toString(indent=True))

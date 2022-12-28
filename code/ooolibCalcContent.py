@@ -70,11 +70,21 @@ class Content:
         self.officeScripts = self.documentContent.addChild(ooolibXML.Element("office:scripts"))
         # Office Font Face Decls
         self.officeFontFace = self.documentContent.addChild(ooolibXML.Element("office:font-face-decls"))
-        fontFace = self.officeFontFace.addChild(ooolibXML.Element("style:font-face"))
-        fontFace.setAttribute("style:name", "Liberation Sans")
-        fontFace.setAttribute("svg:font-family", "&apos;Liberation Sans&apos;")
-        fontFace.setAttribute("style:font-family-generic", "swiss")
-        fontFace.setAttribute("style:font-pitch", "variable")
+        fontFace1 = self.officeFontFace.addChild(ooolibXML.Element("style:font-face"))
+        fontFace1.setAttribute("style:name", "Liberation Sans")
+        fontFace1.setAttribute("svg:font-family", "&apos;Liberation Sans&apos;")
+        fontFace1.setAttribute("style:font-family-generic", "swiss")
+        fontFace1.setAttribute("style:font-pitch", "variable")
+        fontFace2 = self.officeFontFace.addChild(ooolibXML.Element("style:font-face"))
+        fontFace2.setAttribute("style:name", "Lucida Sans")
+        fontFace2.setAttribute("svg:font-family", "&apos;Lucida Sans&apos;")
+        fontFace2.setAttribute("style:font-family-generic", "system")
+        fontFace2.setAttribute("style:font-pitch", "variable")
+        fontFace3 = self.officeFontFace.addChild(ooolibXML.Element("style:font-face"))
+        fontFace3.setAttribute("style:name", "Microsoft YaHei")
+        fontFace3.setAttribute("svg:font-family", "&apos;Microsoft YaHei&apos;")
+        fontFace3.setAttribute("style:font-family-generic", "system")
+        fontFace3.setAttribute("style:font-pitch", "variable")
         # Automatic Styles
         self.officeAutomaticStyles = self.documentContent.addChild(ooolibXML.Element("office:automatic-styles"))
         # Automatic Style Column
@@ -107,33 +117,30 @@ class Content:
         calculationSettings.setAttribute("table:automatic-find-labels", "false")
         calculationSettings.setAttribute("table:use-regular-expressions", "false")
         calculationSettings.setAttribute("table:use-wildcards", "true")
-
         # Connect sheets here
-        """
-        tableSheet1 = self.officeSpreadsheet.addChild(ooolibXML.Element("table:table"))
-        tableSheet1.setAttribute("table:name", "Sheet1")
-        tableSheet1.setAttribute("table:style-name", "ta1")
-        tableColumn = tableSheet1.addChild(ooolibXML.Element("table:table-column"))
-        tableColumn.setAttribute("table:style-name", "co1")
-        tableColumn.setAttribute("table:default-cell-style-name", "Default")
-        tableRow = tableSheet1.addChild(ooolibXML.Element("table:table-row"))
-        tableRow.setAttribute("table:style-name", "ro1")
-        tableCell = tableRow.addChild(ooolibXML.Element("table:table-cell"))
-        """
-        # Named Expressions
-        tableNamedExpressions = self.officeSpreadsheet.addChild(ooolibXML.Element("table:named-expressions"))
-        
+        # Connect named expressions here - After tables or Excel crashes
+        #self.officeSpreadsheet.addChild(ooolibXML.Element("table:named-expressions"))
+
     def addTable(self, name=None):
         table = ContentTable(self.global_object, name)
         self.internal_tables.append(table)
         self.activeTable = table
         return table
 
+    def updateStats(self):
+        # Table Count
+        self.global_object.setGlobalInt("tableCount", len(self.internal_tables))
+        # Count Cells
+        cellCount = 0
+        for table in self.internal_tables:
+            cellCount += table.cellCount
+        self.global_object.setGlobalInt("cellCount", cellCount)
+
     def buildTables(self):
         for table in self.internal_tables:
             tableObject = table.tableObject()
             self.officeSpreadsheet.addChild(tableObject)
-        
+
     def toString(self, indent=False):
         self.buildTables()
         contentString = self.prolog.toString()
@@ -152,6 +159,7 @@ class ContentTable:
         if (self.name == None):
             self.name = "Sheet%d" % self.global_object.incrementGlobalInt("tableSheetNumber")
         # Build internal variables
+        self.cellCount = 0    # Initialized to 0
         self.columnCount = 1  # First Column = A = 1
         self.rowCount = 1     # First row is 1
         self.tableData = {}
@@ -192,7 +200,16 @@ class ContentTable:
         # Should have row and col calculated
         return (row, col)
 
+    #########################
+    # Table Cell Management #
+    #########################
+    def createCellCount(self, row, col):
+        tableIndex = (row, col)
+        if not tableIndex in self.tableData:
+            self.cellCount += 1
+
     def setCellFloat(self, row, col, value):
+        self.createCellCount(row, col) # Update cell count
         # Set table data
         tableIndex = (row, col)
         cellContents = ("float", value)
@@ -200,12 +217,14 @@ class ContentTable:
         self.updateMaximums(row, col)
 
     def setCellText(self, row, col, text):
+        self.createCellCount(row, col) # Update cell count
         tableIndex = (row, col)
         cellContents = ("string", text)
         self.tableData[tableIndex] = cellContents
         self.updateMaximums(row, col)        
 
     def setCellDate(self, row, col, value):
+        self.createCellCount(row, col) # Update cell count
         # Sanitize
         if not isinstance(value, datetime.datetime):
             self.setCellText(row, col, "Date Error: "+str(value))

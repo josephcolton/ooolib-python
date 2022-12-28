@@ -34,22 +34,23 @@ class Meta:
         self.officeMeta = ooolibXML.Element("office:meta")
         # Creation Date
         dateStr = datetime.datetime.now().isoformat()
-        self.creationDate = ooolibXML.Element("meta:creation-date", dateStr)
-        # Document Statistics
-        self.documentStatistic = ooolibXML.Element("meta:document-statistic")
-        self.documentStatistic.setAttribute("meta:table-count", "1")
-        self.documentStatistic.setAttribute("meta:cell-count", "0")
-        self.documentStatistic.setAttribute("meta:object-count", "0")
+        self.creationDate = self.officeMeta.addChild(ooolibXML.Element("meta:creation-date", dateStr))
+        # Document Statistics - Fill in later
+        self.documentStatistic = self.officeMeta.addChild(ooolibXML.Element("meta:document-statistic"))
         # Generator (this python module)
-        self.metaGenerator = ooolibXML.Element("meta:generator", self.global_object.getVersion())
+        self.officeMeta.addChild(ooolibXML.Element("meta:generator", self.global_object.getVersion()))
         # Connect components
-        self.officeMeta.addChild(self.creationDate)
-        self.officeMeta.addChild(self.documentStatistic)
-        self.officeMeta.addChild(self.metaGenerator)
         self.documentMeta.addChild(self.officeMeta)
 
     def updateStatistics(self):
-        pass
+        # Get statistics from global object
+        tableCount = self.global_object.getGlobalInt("tableCount")
+        cellCount = self.global_object.getGlobalInt("cellCount")
+        objectCount = self.global_object.getGlobalInt("objectCount")
+        # Update statistics
+        self.documentStatistic.setAttribute("meta:table-count", tableCount)
+        self.documentStatistic.setAttribute("meta:cell-count", cellCount)
+        self.documentStatistic.setAttribute("meta:object-count", objectCount)
 
     def toString(self, indent=False):
         self.updateStatistics()

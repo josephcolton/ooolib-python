@@ -20,6 +20,7 @@ class Global:
         return versionStr
 
     def getGlobalInt(self, name, setDefault=0):
+        #print("getGlobalInt(%s)" % (name))
         # Sanitize
         setDefault = int(setDefault)
         # Simple get if existing
@@ -31,6 +32,7 @@ class Global:
             return setDefault
 
     def setGlobalInt(self, name, value):
+        #print("setGlobalInt(%s, %s)" % (name, value))
         value = int(value)             # Sanitize value
         self.global_ints[name] = value # Set value
         return value                   # Return set value
