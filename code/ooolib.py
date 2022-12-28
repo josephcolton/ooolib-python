@@ -68,12 +68,13 @@ class Writer:
 ###################
 if __name__ == "__main__":
     # Make sure we can make simple documents
-    os.makedirs("example", exist_ok=True)
+    testdir = os.path.join("..", "test")
+    os.makedirs(testdir, exist_ok=True)
     #################################
     # Example 1 - Blank Spreadsheet #
     #################################
     calc = Calc()
-    calc.export("example/example1-blank.ods")
+    calc.export(os.path.join(testdir, "example1-blank.ods"))
     ########################################
     # Example 2 - Spreadsheet with numbers #
     ########################################
@@ -82,7 +83,7 @@ if __name__ == "__main__":
         for col in range(1, 5+1):
             value = row * col
             calc.content.activeTable.setCellFloat(row, col, value)
-    calc.export("example/example2-numbers.ods")
+    calc.export(os.path.join(testdir, "example2-numbers.ods"))
     #################################################
     # Example 3 - Spreadsheet with text and numbers #
     #################################################
@@ -96,5 +97,5 @@ if __name__ == "__main__":
     # Row 3
     calc.content.activeTable.setCellFloat(3, 1, 2038)
     calc.content.activeTable.setCellText(3, 2, "Epochalypse")
-    calc.export("example/example3-number_text.ods")
+    calc.export(os.path.join(testdir, "example3-number_text.ods"))
 
