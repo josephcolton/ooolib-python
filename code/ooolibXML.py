@@ -244,6 +244,15 @@ class Element:
         child.addChild(Element("text:p", value))
         return child
 
+    def addTableCellDate(self, value):
+        child = self.addChild(Element("table:table-cell"))
+        child.setAttribute("office:value-type", "date")
+        child.setAttribute("office:date-value", value.isoformat())
+        child.setAttribute("calcext:value-type", "date")
+        # Display text
+        child.addChild(Element("text:p", value.isoformat()))
+        return child
+
     #####################
     # String Conversion #
     #####################

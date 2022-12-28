@@ -8,6 +8,7 @@
 
 # Import python modules
 import os
+import datetime
 
 # Import ooolib-python modules
 import ooolibGlobal
@@ -17,13 +18,14 @@ import ooolibXML
 # ooolib-python Calc Content #
 ##############################
 class Content:
-    def __init__(self, global_object):
+    def __init__(self, global_object, autoInit=True):
         # Passed in variables
         self.global_object = global_object
         # Internal objects
         self.internal_tables = []
         self.global_object.setGlobalInt("tableSheetNumber", 1) # First sheet number
-        self.activeTable = self.addTable()
+        self.activeTable = None
+        if autoInit: self.activeTable = self.addTable() # Allow table creation control
         # Create XML components
         self.prolog = ooolibXML.Prolog("xml")
         # Office Document Content
@@ -124,6 +126,7 @@ class Content:
     def addTable(self, name=None):
         table = ContentTable(self.global_object, name)
         self.internal_tables.append(table)
+        self.activeTable = table
         return table
 
     def buildTables(self):
@@ -153,7 +156,10 @@ class ContentTable:
         self.rowCount = 1     # First row is 1
         self.tableData = {}
         self.tableStyles = {}
-        
+
+    def renameTable(self, name):
+        self.name = name
+
     def convertCellRowCol2Id(self, row, col):
         chars = []
         # Convert column into letters
@@ -199,6 +205,17 @@ class ContentTable:
         self.tableData[tableIndex] = cellContents
         self.updateMaximums(row, col)        
 
+    def setCellDate(self, row, col, value):
+        # Sanitize
+        if not isinstance(value, datetime.datetime):
+            self.setCellText(row, col, "Date Error: "+str(value))
+            return
+        # Set the value
+        tableIndex = (row, col)
+        cellContents = ("date", value)
+        self.tableData[tableIndex] = cellContents
+        self.updateMaximums(row, col)
+
     def updateMaximums(self, row, col):
         # Update maximums
         if (row > self.rowCount): self.rowCount = row
@@ -218,7 +235,7 @@ class ContentTable:
             self.tableData[rowMaxIndex] = defaultCol
         # Return row max
         return rowMax
-            
+
     def tableObject(self):
         # Generate table
         tableSheet = ooolibXML.Element("table:table")
@@ -249,6 +266,9 @@ class ContentTable:
                     if (cellType == "string"):
                         cellValue = cellContents[1]
                         tableRow.addTableCellString(cellValue)
+                    if (cellType == "date"):
+                        cellValue = cellContents[1]
+                        tableRow.addTableCellDate(cellValue)
                 else:
                     tableRow.addChild(ooolibXML.Element("table:table-cell"))
         # Return completed table sheet

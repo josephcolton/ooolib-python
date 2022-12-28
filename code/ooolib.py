@@ -26,11 +26,11 @@ class Calc:
 
     Base object for creating ODF spreadsheets
     """
-    def __init__(self):
+    def __init__(self, autoInit=True):
         self.global_object = ooolibGlobal.Global()
         self.manifest = ooolibCalcManifest.Manifest(self.global_object)
         self.meta = ooolibMeta.Meta(self.global_object)
-        self.content = ooolibCalcContent.Content(self.global_object)
+        self.content = ooolibCalcContent.Content(self.global_object, autoInit)
         self.settings = ooolibCalcSettings.Settings(self.global_object)
         self.styles = ooolibCalcStyles.Styles(self.global_object)
 
