@@ -12,7 +12,7 @@ class Global:
     """
     def __init__(self):
         self.project = "ooolib-python"
-        self.version = "1.2"
+        self.version = "0.2.0"
         self.global_ints = {}
 
     def getVersion(self):

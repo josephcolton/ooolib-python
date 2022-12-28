@@ -12,7 +12,8 @@ import os, sys
 # Import ooolib-python modules
 import ooolibGlobal
 import ooolibFile
-import ooolibMeta
+# Calc Modules
+import ooolibCalcMeta
 import ooolibCalcContent
 import ooolibCalcManifest
 import ooolibCalcSettings
@@ -29,7 +30,7 @@ class Calc:
     def __init__(self, autoInit=True):
         self.global_object = ooolibGlobal.Global()
         self.manifest = ooolibCalcManifest.Manifest(self.global_object)
-        self.meta = ooolibMeta.Meta(self.global_object)
+        self.meta = ooolibCalcMeta.Meta(self.global_object)
         self.content = ooolibCalcContent.Content(self.global_object, autoInit)
         self.settings = ooolibCalcSettings.Settings(self.global_object)
         self.styles = ooolibCalcStyles.Styles(self.global_object)
