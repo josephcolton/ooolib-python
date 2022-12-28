@@ -127,6 +127,23 @@ class Content:
         self.activeTable = table
         return table
 
+    def setActiveTable(self, name=None):
+        # Set activeTable to last if none if passed in.  If none exist, create one.
+        if (name == None):
+            if self.internal_tables:
+                self.activeTable = self.internal_tables[-1]
+            else:
+                self.addTable()
+            return self.activeTable
+        # Search for the matching table
+        for table in self.internal_tables:
+            if table.getTableName() == name:
+                self.activeTable = table
+                return self.activeTable
+        # Hmm, didn't find the table
+        print("setActiveTable('%s') - Unable to find table sheet" % (name))
+        return self.activeTable
+
     def updateStats(self):
         # Table Count
         self.global_object.setGlobalInt("tableCount", len(self.internal_tables))
@@ -165,8 +182,12 @@ class ContentTable:
         self.tableData = {}
         self.tableStyles = {}
 
-    def renameTable(self, name):
+    def setTableName(self, name):
         self.name = name
+        return self.name
+
+    def getTableName(self):
+        return self.name
 
     def convertCellRowCol2Id(self, row, col):
         chars = []
