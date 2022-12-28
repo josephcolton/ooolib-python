@@ -18,7 +18,10 @@ import ooolibXML
 #############################
 class Meta:
     def __init__(self, global_object):
+        # Get passed in objects
         self.global_object = global_object
+        # Document variables
+        self.metaData = {}
         # Create XML components
         self.prolog = ooolibXML.Prolog("xml")
         # Office Document Meta
@@ -31,7 +34,7 @@ class Meta:
         self.documentMeta.setAttribute("xmlns:dc", "http://purl.org/dc/elements/1.1/")
         self.documentMeta.setAttribute("office:version", "1.3")
         # Office Meta
-        self.officeMeta = ooolibXML.Element("office:meta")
+        self.officeMeta = self.documentMeta.addChild(ooolibXML.Element("office:meta"))
         # Creation Date
         dateStr = datetime.datetime.now().isoformat()
         self.creationDate = self.officeMeta.addChild(ooolibXML.Element("meta:creation-date", dateStr))
@@ -39,8 +42,51 @@ class Meta:
         self.documentStatistic = self.officeMeta.addChild(ooolibXML.Element("meta:document-statistic"))
         # Generator (this python module)
         self.officeMeta.addChild(ooolibXML.Element("meta:generator", self.global_object.getVersion()))
-        # Connect components
-        self.documentMeta.addChild(self.officeMeta)
+
+        # Initialize Blank Objects for Meta Objects
+        self.metaData["title"] = None
+        self.metaData["subject"] = None
+        self.metaData["description"] = None
+        self.metaData["keywords"] = []
+
+    ##########################
+    # Set Document Meta Data #
+    ##########################
+    def setTitle(self, title):
+        # Create child data
+        if self.metaData["title"] == None:
+            self.metaData["title"] = self.officeMeta.addChild(ooolibXML.Element("dc:title"))
+        # Set/reset the title
+        self.metaData["title"].setText(title)
+
+    def setSubject(self, subject):
+        # Create child data
+        if self.metaData["subject"] == None:
+            self.metaData["subject"] = self.officeMeta.addChild(ooolibXML.Element("dc:subject"))
+        # Set/reset the subject
+        self.metaData["subject"].setText(subject)
+
+    def setDescription(self, description):
+        # Create child data
+        if self.metaData["description"] == None:
+            self.metaData["description"] = self.officeMeta.addChild(ooolibXML.Element("dc:description"))
+        # Set/reset the description
+        self.metaData["description"].setText(description)
+
+    def addKeyword(self, keyword):
+        # See if the keyword already exists
+        for keywordObject in self.metaData["keywords"]:
+            if (keywordObject.getText() == keyword): return
+        # Add the keyword object
+        keywordObject = self.officeMeta.addChild(ooolibXML.Element("meta:keyword"))
+        keywordObject.setText(keyword)
+        self.metaData["keywords"].append(keywordObject)
+
+    ##################
+    # XML Generation #
+    ##################
+    def updateObjects(self):
+        pass
 
     def updateStatistics(self):
         # Get statistics from global object
@@ -53,6 +99,7 @@ class Meta:
         self.documentStatistic.setAttribute("meta:object-count", objectCount)
 
     def toString(self, indent=False):
+        self.updateObjects()
         self.updateStatistics()
         metaString = self.prolog.toString()
         metaString += self.documentMeta.toString(indent)
