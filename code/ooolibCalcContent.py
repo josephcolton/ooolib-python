@@ -25,6 +25,11 @@ class Content:
         self.internal_tables = []
         self.global_object.setGlobalInt("tableSheetNumber", 1) # First sheet number
         self.activeTable = None
+        # Create automatic styles object
+        self.automaticStyles = ooolibXML.Element("office:automatic-styles")
+        self.automaticStylesInstance = AutomaticStyles(self.global_object, self.automaticStyles)
+        self.global_object.setGlobalObjects("automaticStyles", self.automaticStylesInstance)
+        # Create table if needed
         if autoInit: self.activeTable = self.addTable() # Allow table creation control
         # Create XML components
         self.prolog = ooolibXML.Prolog("xml")
@@ -85,32 +90,17 @@ class Content:
         fontFace3.setAttribute("svg:font-family", "&apos;Microsoft YaHei&apos;")
         fontFace3.setAttribute("style:font-family-generic", "system")
         fontFace3.setAttribute("style:font-pitch", "variable")
-        # Automatic Styles
-        self.officeAutomaticStyles = self.documentContent.addChild(ooolibXML.Element("office:automatic-styles"))
-        # Automatic Style Column
-        styleCo1 = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
-        styleCo1.setAttribute("style:name", "co1")
-        styleCo1.setAttribute("style:family", "table-column")
-        styleColProp = styleCo1.addChild(ooolibXML.Element("style:table-column-properties"))
-        styleColProp.setAttribute("fo:break-before", "auto")
-        styleColProp.setAttribute("style:column-width", "0.889in")
-        # Automatic Style Row
-        styleRo1 = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
-        styleRo1.setAttribute("style:name", "ro1")
-        styleRo1.setAttribute("style:family", "table-row")
-        styleRo1Prop = styleRo1.addChild(ooolibXML.Element("style:table-row-properties"))
-        styleRo1Prop.setAttribute("style:row-height", "0.178in")
-        styleRo1Prop.setAttribute("fo:break-before", "auto")
-        styleRo1Prop.setAttribute("style:use-optimal-row-height", "true")
-        # Automatic Style Table
-        styleTa1 = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
-        styleTa1.setAttribute("style:name", "ta1")
-        styleTa1.setAttribute("style:family", "table")
-        styleTa1.setAttribute("style:master-page-name", "Default")
-        styleTa1Prop = styleTa1.addChild(ooolibXML.Element("style:table-properties"))
-        styleTa1Prop.setAttribute("table:display", "true")
-        styleTa1Prop.setAttribute("style:writing-mode", "lr-tb")
-        # Office Body
+        ####################
+        # Automatic Styles #
+        ####################
+        # if autoInit:
+        self.global_object.setGlobalString("defaultColumnStyle", self.automaticStylesInstance.getColumnStyle())
+        self.global_object.setGlobalString("defaultRowStyle", self.automaticStylesInstance.getRowStyle())
+        self.global_object.setGlobalString("defaultTableStyle", self.automaticStylesInstance.getTableStyle())
+        self.documentContent.addChild(self.automaticStyles)
+        ###############
+        # Office Body #
+        ###############
         self.officeBody = self.documentContent.addChild(ooolibXML.Element("office:body"))
         self.officeSpreadsheet = self.officeBody.addChild(ooolibXML.Element("office:spreadsheet"))
         calculationSettings = self.officeSpreadsheet.addChild(ooolibXML.Element("table:calculation-settings"))
@@ -159,10 +149,129 @@ class Content:
             self.officeSpreadsheet.addChild(tableObject)
 
     def toString(self, indent=False):
+        # Update styles
+        # Build tables
         self.buildTables()
         contentString = self.prolog.toString()
         contentString += self.documentContent.toString(indent)
         return contentString
+
+####################
+# Automatic Styles #
+####################
+class AutomaticStyles:
+    def __init__(self, global_object, automaticStyles):
+        self.global_object = global_object
+        self.officeAutomaticStyles = automaticStyles
+        # Keep track of styles
+        self.styleObjects = {}
+        # Initialize Global Ints
+        self.global_object.setGlobalInt("automaticStyleColumn", 1)
+        self.global_object.setGlobalInt("automaticStyleRow", 1)
+        self.global_object.setGlobalInt("automaticStyleTable", 1)
+
+    def extractData(self, data, name, default=None):
+        # Return None if no data or missing key
+        if data == None: return default
+        if not name in data: return default
+        # Return data
+        return data[name]
+
+    ###########################
+    # Automatic Column Styles #
+    ###########################
+    def getColumnStyle(self, columnData=None):
+        # Build index based on contents of columnData
+        index = ("col", self.extractData(columnData, "width"))
+        # Create entry if missing
+        if not index in self.styleObjects:
+            self.styleObjects[index] = self.createColumnStyle(columnData)
+        # Return object
+        return self.styleObjects[index]
+
+    def createColumnStyle(self, columnData):
+        # Get attributes from data
+        width = self.extractData(columnData, "width", "0.889in")
+        # Get column number
+        colNum = self.global_object.incrementGlobalInt("automaticStyleColumn")
+        colName = "co%d" % colNum
+        # Create object
+        styleObject = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
+        styleObject.setAttribute("style:name", colName)
+        styleObject.setAttribute("style:family", "table-column")
+        styleProperties = styleObject.addChild(ooolibXML.Element("style:table-column-properties"))
+        styleProperties.setAttribute("fo:break-before", "auto")
+        styleProperties.setAttribute("style:column-width", width)
+        # Save style object
+        self.styleObjects[colName] = styleObject
+        # Return style name
+        return colName
+
+    ########################
+    # Automatic Row Styles #
+    ########################
+    def getRowStyle(self, rowData=None):
+        # Build index based on contents of rowData
+        index = ("row", self.extractData(rowData, "height"))
+        # Create entry if missing
+        if not index in self.styleObjects:
+            self.styleObjects[index] = self.createRowStyle(rowData)
+        # Return object
+        return self.styleObjects[index]
+
+    def createRowStyle(self, rowData=None):
+        # Get attributes from data
+        height = self.extractData(rowData, "height", "0.178in")
+        # Get row number
+        rowNum = self.global_object.incrementGlobalInt("automaticStyleRow")
+        rowName = "ro%d" % rowNum
+        # Automatic Style Row
+        styleObject = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
+        styleObject.setAttribute("style:name", rowName)
+        styleObject.setAttribute("style:family", "table-row")
+        styleObjectProp = styleObject.addChild(ooolibXML.Element("style:table-row-properties"))
+        styleObjectProp.setAttribute("style:row-height", height)
+        styleObjectProp.setAttribute("fo:break-before", "auto")
+        # styleObjectProp.setAttribute("style:use-optimal-row-height", "true")
+        # Save style object
+        self.styleObjects[rowName] = styleObject
+        # Return style name
+        return rowName
+
+    ##########################
+    # Automatic Table Styles #
+    ##########################
+    def getTableStyle(self, tableData=None):
+        # Build index based on contents of tableData
+        index = ("table")
+        # Create entry if missing
+        if not index in self.styleObjects:
+            self.styleObjects[index] = self.createTableStyle(tableData)
+        # Return object
+        return self.styleObjects[index]
+
+    def createTableStyle(self, tableData=None):
+        # Get table number
+        tableNum = self.global_object.incrementGlobalInt("automaticStyleTable")
+        tableName = "ta%d" % tableNum
+        # Automatic Style Table
+        styleObject = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
+        styleObject.setAttribute("style:name", tableName)
+        styleObject.setAttribute("style:family", "table")
+        styleObject.setAttribute("style:master-page-name", "Default")
+        styleObjectProp = styleObject.addChild(ooolibXML.Element("style:table-properties"))
+        styleObjectProp.setAttribute("table:display", "true")
+        styleObjectProp.setAttribute("style:writing-mode", "lr-tb")
+        # Save style object
+        self.styleObjects[tableName] = styleObject
+        # Return style name
+        return tableName
+
+    #########################
+    # Automatic Cell Styles #
+    #########################
+    def getCellStyle(self, cellData=None):
+        return "ce1"
 
 #######################
 # Content Table Class #
@@ -181,14 +290,12 @@ class ContentTable:
         self.rowCount = 1     # First row is 1
         self.tableData = {}
         self.tableStyles = {}
+        # Automatic Styles
+        self.automaticStylesInstance = self.global_object.getGlobalObjects("automaticStyles")
 
-    def setTableName(self, name):
-        self.name = name
-        return self.name
-
-    def getTableName(self):
-        return self.name
-
+    ######################
+    # Conversion Methods #
+    ######################
     def convertCellRowCol2Id(self, row, col):
         chars = []
         # Convert column into letters
@@ -221,6 +328,88 @@ class ContentTable:
         # Should have row and col calculated
         return (row, col)
 
+    ####################
+    # Table Management #
+    ####################
+    def setTableName(self, name):
+        self.name = name
+        return self.name
+
+    def getTableName(self):
+        return self.name
+
+    def getTableStyle(self):
+        index = ("table")
+        # Return default if none have been created
+        tableStyleName = self.global_object.getGlobalString("defaultTableStyle")
+        if not index in self.tableStyles: return tableStyleName
+        # Return created style
+        return tableStyleName
+
+    def updateMaximums(self, row, col):
+        # Update maximums
+        if (row > self.rowCount): self.rowCount = row
+        if (col > self.columnCount): self.columnCount = col
+        # Update Row Max (highest column number for the row)
+        self.getRowMax(row, col)
+
+    ###########################
+    # Table Column Management #
+    ###########################
+    def setColumnWidth(self, col, width):
+        # Create style
+        index = ("column", col)
+        if not index in self.tableStyles:
+            self.tableStyles[index] = {}
+        # Set attribute
+        self.tableStyles[index]["width"] = width
+
+    def getColumnStyle(self, col):
+        index = ("column", col)
+        # Return default if none have been created
+        colStyleName = self.global_object.getGlobalString("defaultColumnStyle")
+        if not index in self.tableStyles: return colStyleName
+        # Pass style dictionary to automatic styles
+        colData = self.tableStyles[index]
+        colStyleName = self.automaticStylesInstance.getColumnStyle(colData)
+        # Return created style
+        return colStyleName
+
+    ########################
+    # Table Row Management #
+    ########################
+    def setRowHeight(self, row, height):
+        # Create style
+        index = ("row", row)
+        if not index in self.tableStyles:
+            self.tableStyles[index] = {}
+        # Set attribute
+        self.tableStyles[index]["height"] = height
+
+    def getRowStyle(self, row):
+        index = ("row", row)
+        # Return default if none have been created
+        rowStyleName = self.global_object.getGlobalString("defaultRowStyle")
+        if not index in self.tableStyles: return rowStyleName
+        # Pass style dictionary to automatic styles
+        rowData = self.tableStyles[index]
+        rowStyleName = self.automaticStylesInstance.getRowStyle(rowData)
+        # Return created style
+        return rowStyleName
+
+    def getRowMax(self, row, defaultCol=1):
+        rowMaxIndex = ("rowMax", row)
+        rowMax = defaultCol
+        if rowMaxIndex in self.tableData:
+            rowMax = self.tableData[rowMaxIndex]
+            if defaultCol > rowMax:
+                self.tableData[rowMaxIndex] = defaultCol
+                rowMax = defaultCol
+        else:
+            self.tableData[rowMaxIndex] = defaultCol
+        # Return row max
+        return rowMax
+
     #########################
     # Table Cell Management #
     #########################
@@ -242,7 +431,7 @@ class ContentTable:
         tableIndex = (row, col)
         cellContents = ("string", text)
         self.tableData[tableIndex] = cellContents
-        self.updateMaximums(row, col)        
+        self.updateMaximums(row, col)
 
     def setCellDate(self, row, col, value):
         self.createCellCount(row, col) # Update cell count
@@ -256,40 +445,32 @@ class ContentTable:
         self.tableData[tableIndex] = cellContents
         self.updateMaximums(row, col)
 
-    def updateMaximums(self, row, col):
-        # Update maximums
-        if (row > self.rowCount): self.rowCount = row
-        if (col > self.columnCount): self.columnCount = col
-        # Update Row Max (highest column number for the row)
-        self.getRowMax(row, col)
-
-    def getRowMax(self, row, defaultCol=1):
-        rowMaxIndex = ("rowMax", row)
-        rowMax = defaultCol
-        if rowMaxIndex in self.tableData:
-            rowMax = self.tableData[rowMaxIndex]
-            if defaultCol > rowMax:
-                self.tableData[rowMaxIndex] = defaultCol
-                rowMax = defaultCol
-        else:
-            self.tableData[rowMaxIndex] = defaultCol
-        # Return row max
-        return rowMax
-
+    ###########################
+    # Table Object Generation #
+    ###########################
     def tableObject(self):
         # Generate table
         tableSheet = ooolibXML.Element("table:table")
         tableSheet.setAttribute("table:name", self.name)
-        tableSheet.setAttribute("table:style-name", "ta1")
+        # Figure out table style, default or custom
+        tableStyleName = self.getTableStyle()
+        # Set table style
+        tableSheet.setAttribute("table:style-name", tableStyleName)
         # Create columns
         for col in range(1, self.columnCount + 1):
             tableColumn = tableSheet.addChild(ooolibXML.Element("table:table-column"))
-            tableColumn.setAttribute("table:style-name", "co1")
+            # Figure out column style, default or custom
+            colStyleName = self.getColumnStyle(col)
+            # Set column style
+            tableColumn.setAttribute("table:style-name", colStyleName)
             tableColumn.setAttribute("table:default-cell-style-name", "Default")
         # Create rows
         for row in range(1, self.rowCount + 1):
             tableRow = tableSheet.addChild(ooolibXML.Element("table:table-row"))
-            tableRow.setAttribute("table:style-name", "ro1")
+            # Figure out row style, default or custom
+            rowStyleName = self.getRowStyle(row)
+            # Set row style
+            tableRow.setAttribute("table:style-name", rowStyleName)
             # Create row cells
             rowMax = self.getRowMax(row)
             for col in range(1, rowMax+1):
