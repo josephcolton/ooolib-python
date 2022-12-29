@@ -227,8 +227,9 @@ class Element:
     ##########################
     # Special Table Children #
     ##########################
-    def addTableCellFloat(self, value):
+    def addTableCellFloat(self, value, styleName=None):
         child = self.addChild(Element("table:table-cell"))
+        if styleName: child.setAttribute("table:style-name", styleName)
         child.setAttribute("office:value-type", "float")
         child.setAttribute("office:value", value)
         child.setAttribute("calcext:value-type", "float")
@@ -236,16 +237,18 @@ class Element:
         child.addChild(Element("text:p", value))
         return child
 
-    def addTableCellString(self, value):
+    def addTableCellString(self, value, styleName=None):
         child = self.addChild(Element("table:table-cell"))
+        if styleName: child.setAttribute("table:style-name", styleName)
         child.setAttribute("office:value-type", "string")
         child.setAttribute("calcext:value-type", "string")
         # Display text
         child.addChild(Element("text:p", value))
         return child
 
-    def addTableCellDate(self, value):
+    def addTableCellDate(self, value, styleName=None):
         child = self.addChild(Element("table:table-cell"))
+        if styleName: child.setAttribute("table:style-name", styleName)
         child.setAttribute("office:value-type", "date")
         child.setAttribute("office:date-value", value.isoformat())
         child.setAttribute("calcext:value-type", "date")
