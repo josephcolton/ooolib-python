@@ -169,6 +169,7 @@ class AutomaticStyles:
         self.global_object.setGlobalInt("automaticStyleColumn", 1)
         self.global_object.setGlobalInt("automaticStyleRow", 1)
         self.global_object.setGlobalInt("automaticStyleTable", 1)
+        self.global_object.setGlobalInt("automaticStyleCell", 1)
 
     def extractData(self, data, name, default=None):
         # Return None if no data or missing key
@@ -271,7 +272,66 @@ class AutomaticStyles:
     # Automatic Cell Styles #
     #########################
     def getCellStyle(self, cellData=None):
-        return "ce1"
+        # Build index based on contents of cellData
+        index = ("cell",
+                 self.extractData(cellData, "bold"),
+                 self.extractData(cellData, "italics"),
+                 self.extractData(cellData, "underline"),
+                 self.extractData(cellData, "fontcolor"),
+                 self.extractData(cellData, "bgcolor"),
+                 self.extractData(cellData, "fontsize")
+                 )
+        # Create entry if missing
+        if not index in self.styleObjects:
+            self.styleObjects[index] = self.createCellStyle(cellData)
+        # Return object
+        return self.styleObjects[index]
+
+    def createCellStyle(self, cellData=None):
+        # Get table number
+        cellNum = self.global_object.incrementGlobalInt("automaticStyleCell")
+        cellName = "ce%d" % cellNum
+        # Automatic Style Table
+        styleObject = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
+        styleObject.setAttribute("style:name", cellName)
+        styleObject.setAttribute("style:family", "table-cell")
+        styleObject.setAttribute("style:parent-style-name", "Default")
+        # Initialize properties variables to None
+        styleObjectProp = None
+        styleObjectCellProp = None
+        # Look at contents of cellData
+        if (self.extractData(cellData, "bold", False) == True):
+            if (styleObjectProp == None): styleObjectProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
+            styleObjectProp.setAttribute("fo:font-weight", "bold")
+            styleObjectProp.setAttribute("style:font-weight-asian", "bold")
+            styleObjectProp.setAttribute("style:font-weight-complex", "bold")
+        if (self.extractData(cellData, "italics", False) == True):
+            if (styleObjectProp == None): styleObjectProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
+            styleObjectProp.setAttribute("fo:font-style", "italic")
+            styleObjectProp.setAttribute("style:font-style-asian", "italic")
+            styleObjectProp.setAttribute("style:font-style-complex", "italic")
+        if (self.extractData(cellData, "underline", False) == True):
+            if (styleObjectProp == None): styleObjectProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
+            styleObjectProp.setAttribute("style:text-underline-style", "solid")
+            styleObjectProp.setAttribute("style:text-underline-width", "auto")
+            styleObjectProp.setAttribute("style:text-underline-color", "font-color")
+        if (self.extractData(cellData, "fontcolor", None) != None):
+            if (styleObjectProp == None): styleObjectProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
+            styleObjectProp.setAttribute("fo:color", self.extractData(cellData, "fontcolor"))
+        if (self.extractData(cellData, "bgcolor", None) != None):
+            if (styleObjectCellProp == None): styleObjectCellProp = styleObject.addChild(ooolibXML.Element("style:table-cell-properties"))
+            styleObjectCellProp.setAttribute("fo:background-color", self.extractData(cellData, "bgcolor"))
+        if (self.extractData(cellData, "fontsize", None) != None):
+            if (styleObjectProp == None): styleObjectProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
+            styleObjectProp.setAttribute("fo:font-size", self.extractData(cellData, "fontsize"))
+            styleObjectProp.setAttribute("style:font-size-asian", self.extractData(cellData, "fontsize"))
+            styleObjectProp.setAttribute("style:font-size-complex", self.extractData(cellData, "fontsize"))
+            # styleObjectProp.setAttribute("", "")
+        # Save style object
+        self.styleObjects[cellName] = styleObject
+        # Return style name
+        return cellName
+
 
 #######################
 # Content Table Class #
@@ -413,6 +473,53 @@ class ContentTable:
     #########################
     # Table Cell Management #
     #########################
+    def __updateCellStyleValue(self, row, col, name, value=None):
+        """__updateCellStyleValue - Add/Remove/Update cell style"""
+        # Make sure cell style exists
+        index = ("cell", row, col)
+        if not index in self.tableStyles:
+            self.tableStyles[index] = {}
+        # Remove unneeded styles
+        if (value == None or value == False):
+            if name in self.tableStyles[index]:
+                self.tableStyles[index].pop(name) # Remove style
+            return
+        # Must have a value
+        self.tableStyles[index][name] = value
+
+    def getCellStyle(self, row, col):
+        index = ("cell", row, col)
+        # Return default if none have been created
+        cellStyleName = self.global_object.getGlobalString("defaultCellStyle")
+        if not index in self.tableStyles: return cellStyleName
+        # Pass style dictionary to automatic styles
+        cellData = self.tableStyles[index]
+        cellStyleName = self.automaticStylesInstance.getCellStyle(cellData)
+        # Return created style
+        return cellStyleName
+
+    # Standard cell properties
+    def setCellBold(self, row, col, value=True):
+        self.__updateCellStyleValue(row, col, "bold", value)
+
+    def setCellItalics(self, row, col, value=True):
+        self.__updateCellStyleValue(row, col, "italics", value)
+
+    def setCellUnderline(self, row, col, value=True):
+        self.__updateCellStyleValue(row, col, "underline", value)
+
+    # Cell colors
+    def setCellFontColor(self, row, col, value):
+        self.__updateCellStyleValue(row, col, "fontcolor", value)
+
+    def setCellBackgroundColor(self, row, col, value):
+        self.__updateCellStyleValue(row, col, "bgcolor", value)
+
+    # Font sizes
+    def setCellFontSize(self, row, col, value=None):
+        self.__updateCellStyleValue(row, col, "fontsize", value)
+
+    # Cell Data
     def createCellCount(self, row, col):
         tableIndex = (row, col)
         if not tableIndex in self.tableData:
@@ -481,15 +588,16 @@ class ContentTable:
                     # Table Cell Creation #
                     #######################
                     cellType = cellContents[0]
+                    cellStyleName = self.getCellStyle(row, col)
                     if (cellType == "float"):
                         cellValue = cellContents[1]
-                        tableRow.addTableCellFloat(cellValue)
+                        tableRow.addTableCellFloat(cellValue, cellStyleName)
                     if (cellType == "string"):
                         cellValue = cellContents[1]
-                        tableRow.addTableCellString(cellValue)
+                        tableRow.addTableCellString(cellValue, cellStyleName)
                     if (cellType == "date"):
                         cellValue = cellContents[1]
-                        tableRow.addTableCellDate(cellValue)
+                        tableRow.addTableCellDate(cellValue, cellStyleName)
                 else:
                     tableRow.addChild(ooolibXML.Element("table:table-cell"))
         # Return completed table sheet
