@@ -1,10 +1,25 @@
 # ooolib-python
 
 # Installation
+You can download the code, then add it to your path to test the code:
 
+```
+import sys
+sys.path.append('PATH_TO_CODE')
+import ooolib
+doc = ooolib.Calc()
+doc.export("test.ods")
+```
+
+This should create a blank document.  You can then look at the examples directory for more examples.
+
+# History
+I originally wrote ooolib-python in 2006 as I was switching from Perl to Python and needed to replace the ooolib-perl project I had originally created.  I wrote it and maintained it for a couple of years, then stopped working it.  I recently needed to use the ooolib-python modules again, but discovered that the old code was a bit messy and was built for Python 2.  I decided to completely rewrite the code for Python 3 using a bit more of a object oriented approach.
+
+I decided that I was more interested in working on exporting or creating spreadsheets, so that has been the focus of this version.
 
 # Credits
-
+Written by Joseph Colton <josephcolton@gmail.com>
 
 # License
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
