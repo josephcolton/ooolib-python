@@ -405,6 +405,16 @@ class ContentTable:
         # Should have row and col calculated
         return (row, col)
 
+    def escapeText(self, text):
+        text = text.replace("&", "&amp;")
+        text = text.replace("'", "&apos;")
+        text = text.replace('"', "&quot;")
+        text = text.replace("<", "&lt;")
+        text = text.replace(">", "&gt;")
+        text = text.replace("\t", "<text:tab-stop/>")
+        text = text.replace("\n", "<text:line-break/>")
+        return text
+
     ####################
     # Table Management #
     ####################
@@ -623,6 +633,7 @@ class ContentTable:
 
     def setCellText(self, row, col, text):
         self.createCellCount(row, col) # Update cell count
+        text = self.escapeText(text)   # Escape text to make it clean
         tableIndex = (row, col)
         cellContents = ("string", text)
         self.tableData[tableIndex] = cellContents
