@@ -540,6 +540,66 @@ class ContentTable:
     def setCellHorizontalAlign(self, row, col, value=None):
         self.__updateCellStyleValue(row, col, "halign", value)
 
+    # Formulas
+    def setCellFormulaAverage(self, row, col, startCellId, endCellId):
+        self.createCellCount(row, col) # Update cell count
+        # Set table data
+        tableIndex = (row, col)
+        # Calculate formula
+        value = "of:=AVERAGE([.%s:.%s])" % (startCellId, endCellId)
+        cellContents = ("formula", value)
+        self.tableData[tableIndex] = cellContents
+        self.updateMaximums(row, col)
+
+    def setCellFormulaMin(self, row, col, startCellId, endCellId):
+        self.createCellCount(row, col) # Update cell count
+        # Set table data
+        tableIndex = (row, col)
+        # Calculate formula
+        value = "of:=MIN([.%s:.%s])" % (startCellId, endCellId)
+        cellContents = ("formula", value)
+        self.tableData[tableIndex] = cellContents
+        self.updateMaximums(row, col)
+
+    def setCellFormulaMax(self, row, col, startCellId, endCellId):
+        self.createCellCount(row, col) # Update cell count
+        # Set table data
+        tableIndex = (row, col)
+        # Calculate formula
+        value = "of:=MAX([.%s:.%s])" % (startCellId, endCellId)
+        cellContents = ("formula", value)
+        self.tableData[tableIndex] = cellContents
+        self.updateMaximums(row, col)
+
+    def setCellFormulaSum(self, row, col, startCellId, endCellId):
+        self.createCellCount(row, col) # Update cell count
+        # Set table data
+        tableIndex = (row, col)
+        # Calculate formula
+        value = "of:=SUM([.%s:.%s])" % (startCellId, endCellId)
+        cellContents = ("formula", value)
+        self.tableData[tableIndex] = cellContents
+        self.updateMaximums(row, col)
+
+    def setCellFormulaSqrt(self, row, col, targetCellId):
+        self.createCellCount(row, col) # Update cell count
+        # Set table data
+        tableIndex = (row, col)
+        # Calculate formula
+        value = "of:=SQRT([.%s])" % (targetCellId)
+        cellContents = ("formula", value)
+        self.tableData[tableIndex] = cellContents
+        self.updateMaximums(row, col)
+
+    def setCellFormulaCustom(self, row, col, value):
+        self.createCellCount(row, col) # Update cell count
+        # Set table data
+        tableIndex = (row, col)
+        # Calculate formula
+        cellContents = ("formula", value)
+        self.tableData[tableIndex] = cellContents
+        self.updateMaximums(row, col)
+
     # Cell Data
     def createCellCount(self, row, col):
         tableIndex = (row, col)
@@ -619,6 +679,9 @@ class ContentTable:
                     if (cellType == "date"):
                         cellValue = cellContents[1]
                         tableRow.addTableCellDate(cellValue, cellStyleName)
+                    if (cellType == "formula"):
+                        cellValue = cellContents[1]
+                        tableRow.addTableCellFormula(cellValue, cellStyleName)
                 else:
                     tableRow.addChild(ooolibXML.Element("table:table-cell"))
         # Return completed table sheet
