@@ -12,6 +12,7 @@ import os, sys
 # Import ooolib-python modules
 import ooolibGlobal
 import ooolibFile
+
 # Calc Modules
 import ooolibCalcMeta
 import ooolibCalcContent
@@ -35,9 +36,6 @@ class Calc:
         self.settings = ooolibCalcSettings.Settings(self.global_object)
         self.styles = ooolibCalcStyles.Styles(self.global_object)
 
-    def config(self, name, value):
-        pass
-
     def export(self, filename):
         # Update statistics first
         self.content.updateStats()
@@ -58,44 +56,11 @@ class Writer:
     """
     def __init__(self):
         self.global_object = ooolibGlobal.Global()
-        self.meta = ooolibMeta.Meta(self.global_object)
-
-    def config(self, name, value):
-        pass
 
 ###################
 # Execute to Test #
 ###################
 if __name__ == "__main__":
-    # Make sure we can make simple documents
-    testdir = os.path.join("..", "test")
-    os.makedirs(testdir, exist_ok=True)
-    #################################
-    # Example 1 - Blank Spreadsheet #
-    #################################
+    # Make sure we can make a simple document
     calc = Calc()
-    calc.export(os.path.join(testdir, "example1-blank.ods"))
-    ########################################
-    # Example 2 - Spreadsheet with numbers #
-    ########################################
-    calc = Calc()
-    for row in range(1, 5+1):
-        for col in range(1, 5+1):
-            value = row * col
-            calc.content.activeTable.setCellFloat(row, col, value)
-    calc.export(os.path.join(testdir, "example2-numbers.ods"))
-    #################################################
-    # Example 3 - Spreadsheet with text and numbers #
-    #################################################
-    calc = Calc()
-    # Row 1
-    calc.content.activeTable.setCellText(1, 1, "Year")
-    calc.content.activeTable.setCellText(1, 2, "Event")
-    # Row 2
-    calc.content.activeTable.setCellFloat(2, 1, 2000)
-    calc.content.activeTable.setCellText(2, 2, "Y2K Issues")
-    # Row 3
-    calc.content.activeTable.setCellFloat(3, 1, 2038)
-    calc.content.activeTable.setCellText(3, 2, "Epochalypse")
-    calc.export(os.path.join(testdir, "example3-number_text.ods"))
-
+    calc.export("blank.ods")
