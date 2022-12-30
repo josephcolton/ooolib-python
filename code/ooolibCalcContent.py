@@ -279,7 +279,9 @@ class AutomaticStyles:
                  self.extractData(cellData, "underline"),
                  self.extractData(cellData, "fontcolor"),
                  self.extractData(cellData, "bgcolor"),
-                 self.extractData(cellData, "fontsize")
+                 self.extractData(cellData, "fontsize"),
+                 self.extractData(cellData, "valign"),
+                 self.extractData(cellData, "halign")
                  )
         # Create entry if missing
         if not index in self.styleObjects:
@@ -297,8 +299,9 @@ class AutomaticStyles:
         styleObject.setAttribute("style:family", "table-cell")
         styleObject.setAttribute("style:parent-style-name", "Default")
         # Initialize properties variables to None
-        styleObjectProp = None
-        styleObjectCellProp = None
+        styleObjectProp = None     # style:text-properties
+        styleObjectCellProp = None # style:table-cell-properties
+        styleObjectParaProp = None # style:paragraph-properties
         # Look at contents of cellData
         if (self.extractData(cellData, "bold", False) == True):
             if (styleObjectProp == None): styleObjectProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
@@ -326,7 +329,18 @@ class AutomaticStyles:
             styleObjectProp.setAttribute("fo:font-size", self.extractData(cellData, "fontsize"))
             styleObjectProp.setAttribute("style:font-size-asian", self.extractData(cellData, "fontsize"))
             styleObjectProp.setAttribute("style:font-size-complex", self.extractData(cellData, "fontsize"))
-            # styleObjectProp.setAttribute("", "")
+        if (self.extractData(cellData, "valign", None) != None):
+            if (styleObjectCellProp == None): styleObjectCellProp = styleObject.addChild(ooolibXML.Element("style:table-cell-properties"))
+            styleObjectCellProp.setAttribute("style:text-align-source", "fix")
+            styleObjectCellProp.setAttribute("style:repeat-content", "false")
+            styleObjectCellProp.setAttribute("style:vertical-align", self.extractData(cellData, "valign"))
+        if (self.extractData(cellData, "halign", None) != None):
+            if (styleObjectParaProp == None): styleObjectParaProp = styleObject.addChild(ooolibXML.Element("style:paragraph-properties"))
+            halign = self.extractData(cellData, "halign")
+            if (halign == "left"): halign = "start"
+            if (halign == "right"): halign = "end"
+            styleObjectParaProp.setAttribute("fo:text-align", halign)
+            styleObjectParaProp.setAttribute("fo:margin-left", "0in")
         # Save style object
         self.styleObjects[cellName] = styleObject
         # Return style name
@@ -518,6 +532,13 @@ class ContentTable:
     # Font sizes
     def setCellFontSize(self, row, col, value=None):
         self.__updateCellStyleValue(row, col, "fontsize", value)
+
+    # Text Alignment
+    def setCellVerticalAlign(self, row, col, value=None):
+        self.__updateCellStyleValue(row, col, "valign", value)
+
+    def setCellHorizontalAlign(self, row, col, value=None):
+        self.__updateCellStyleValue(row, col, "halign", value)
 
     # Cell Data
     def createCellCount(self, row, col):
