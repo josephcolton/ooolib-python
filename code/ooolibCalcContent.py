@@ -272,6 +272,9 @@ class AutomaticStyles:
     # Automatic Cell Styles #
     #########################
     def getCellStyle(self, cellData=None):
+        # Return manual styles
+        manualStyle = self.extractData(cellData, "manualStyle", None)
+        if manualStyle != None: return manualStyle
         # Build index based on contents of cellData
         index = ("cell",
                  self.extractData(cellData, "bold"),
@@ -511,6 +514,10 @@ class ContentTable:
         cellStyleName = self.automaticStylesInstance.getCellStyle(cellData)
         # Return created style
         return cellStyleName
+
+    # Set Manual Styles
+    def setCellStyle(self, row, col, value=None):
+        self.__updateCellStyleValue(row, col, "manualStyle", value)
 
     # Standard cell properties
     def setCellBold(self, row, col, value=True):
