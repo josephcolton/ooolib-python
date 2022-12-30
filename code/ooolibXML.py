@@ -256,6 +256,17 @@ class Element:
         child.addChild(Element("text:p", value.isoformat()))
         return child
 
+    def addTableCellFormula(self, value, styleName=None):
+        child = self.addChild(Element("table:table-cell"))
+        if styleName: child.setAttribute("table:style-name", styleName)
+        child.setAttribute("table:formula", value)
+        child.setAttribute("office:value-type", "float")
+        child.setAttribute("office:value", "0")
+        child.setAttribute("calcext:value-type", "float")
+        # Display text
+        child.addChild(Element("text:p"))
+        return child
+
     #####################
     # String Conversion #
     #####################
