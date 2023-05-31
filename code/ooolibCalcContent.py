@@ -406,6 +406,7 @@ class ContentTable:
         return (row, col)
 
     def escapeText(self, text):
+        text = str(text)
         text = text.replace("&", "&amp;")
         text = text.replace("'", "&apos;")
         text = text.replace('"', "&quot;")
