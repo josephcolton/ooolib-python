@@ -8,6 +8,8 @@ import ooolib
 doc = ooolib.Calc()
 
 # Set Manual Styles
+doc.meta.setDescription("Cell Manual Styles")
+
 # These styles override any other settings you might have set
 # The available styles are as follows:
 
