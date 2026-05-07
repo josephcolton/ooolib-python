@@ -1,6 +1,6 @@
 #################################################################################
 # ooolib-python - Python module for creating Open Document Format documents.    #
-# Copyright (C) 2006-2023  Joseph Colton                                        #
+# Copyright (C) 2006-2026  Joseph Colton                                        #
 #                                                                               #
 # You can contact me by email at josephcolton@gmail.com                         #
 #################################################################################
