@@ -469,6 +469,41 @@ doc.export("architecture_diagram.odg")
 
 ---
 
+## Reading Documents
+
+`ooolib.openDocument()` opens an existing ODF file (any type, including files saved by LibreOffice) and gathers information from it. It is read only.
+
+```python
+doc = ooolib.openDocument("drawing.odg")
+
+doc.type                  # "graphics", "presentation", "text" or "spreadsheet"
+doc.meta["title"]         # also subject, description, keywords, creator,
+                          # creationDate, date, generator, statistics, userDefined
+doc.pageLayout            # {"width": "10in", "height": "7.5in", "orientation": ..., margins}
+doc.images                # [{"name": "Pictures/...", "size": 12345}, ...]
+doc.getText()             # all text in the document
+doc.toDict()              # everything above as plain dictionaries (JSON friendly)
+```
+
+Drawings and presentations also expose their pages (slides) and shapes:
+
+```python
+for page in doc.pages:                  # also doc.getPage("Page Two") or doc.getPage(2)
+    print(page.number, page.name, page.notes)
+    for shape in page.getShapes():      # includes shapes inside groups
+        shape.type                      # rect, ellipse, line, textbox, image, custom-shape, group, ...
+        shape.name, shape.text
+        shape.x, shape.y, shape.width, shape.height   # strings as stored, e.g. "1.5in"
+        shape.getBounds("cm")           # (x, y, width, height) as floats in any unit
+        shape.fill, shape.fillColor     # resolved through the document's styles
+        shape.stroke, shape.strokeColor, shape.strokeWidth
+
+doc.getShapes("textbox")                # every text box in the document
+ooolib.convertLength("2.54cm", "in")    # 1.0 (units: in, cm, mm, pt, pc, px)
+```
+
+---
+
 ## Running the Examples
 
 All examples are in the `examples/` directory and should be run from within that directory:
@@ -486,6 +521,7 @@ python calc-example08.py    # predefined named styles
 python writer-example01.py  # headings, paragraphs, text formatting
 python impress-example01.py # slides, titles, content text, background colors
 python draw-example01.py    # rectangles, ellipses, lines, text boxes
+python read-example01.py    # read pages, shapes, and metadata from draw-example01.odg
 ```
 
 ---

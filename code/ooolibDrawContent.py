@@ -41,7 +41,7 @@ class Content:
         officeFontFace = self.documentContent.addChild(ooolibXML.Element("office:font-face-decls"))
         fontFace1 = officeFontFace.addChild(ooolibXML.Element("style:font-face"))
         fontFace1.setAttribute("style:name", "Liberation Sans")
-        fontFace1.setAttribute("svg:font-family", "&apos;Liberation Sans&apos;")
+        fontFace1.setAttribute("svg:font-family", "'Liberation Sans'")
         fontFace1.setAttribute("style:font-family-generic", "swiss")
         fontFace1.setAttribute("style:font-pitch", "variable")
         # Attach automatic styles
@@ -70,6 +70,7 @@ class Content:
         self.global_object.setGlobalInt("drawPageCount", len(self.internal_pages))
 
     def buildPages(self):
+        self.officeDrawing.clearChildren()
         for page in self.internal_pages:
             self.officeDrawing.addChild(page.pageObject())
 

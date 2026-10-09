@@ -47,7 +47,7 @@ class Content:
         officeFontFace = self.documentContent.addChild(ooolibXML.Element("office:font-face-decls"))
         fontFace1 = officeFontFace.addChild(ooolibXML.Element("style:font-face"))
         fontFace1.setAttribute("style:name", "Liberation Sans")
-        fontFace1.setAttribute("svg:font-family", "&apos;Liberation Sans&apos;")
+        fontFace1.setAttribute("svg:font-family", "'Liberation Sans'")
         fontFace1.setAttribute("style:font-family-generic", "swiss")
         fontFace1.setAttribute("style:font-pitch", "variable")
         # Attach automatic styles
@@ -76,6 +76,7 @@ class Content:
         self.global_object.setGlobalInt("slideCount", len(self.internal_slides))
 
     def buildSlides(self):
+        self.officePresentation.clearChildren()
         for slide in self.internal_slides:
             self.officePresentation.addChild(slide.slideObject())
 

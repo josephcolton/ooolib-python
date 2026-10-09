@@ -77,17 +77,17 @@ class Content:
         self.officeFontFace = self.documentContent.addChild(ooolibXML.Element("office:font-face-decls"))
         fontFace1 = self.officeFontFace.addChild(ooolibXML.Element("style:font-face"))
         fontFace1.setAttribute("style:name", "Liberation Sans")
-        fontFace1.setAttribute("svg:font-family", "&apos;Liberation Sans&apos;")
+        fontFace1.setAttribute("svg:font-family", "'Liberation Sans'")
         fontFace1.setAttribute("style:font-family-generic", "swiss")
         fontFace1.setAttribute("style:font-pitch", "variable")
         fontFace2 = self.officeFontFace.addChild(ooolibXML.Element("style:font-face"))
         fontFace2.setAttribute("style:name", "Lucida Sans")
-        fontFace2.setAttribute("svg:font-family", "&apos;Lucida Sans&apos;")
+        fontFace2.setAttribute("svg:font-family", "'Lucida Sans'")
         fontFace2.setAttribute("style:font-family-generic", "system")
         fontFace2.setAttribute("style:font-pitch", "variable")
         fontFace3 = self.officeFontFace.addChild(ooolibXML.Element("style:font-face"))
         fontFace3.setAttribute("style:name", "Microsoft YaHei")
-        fontFace3.setAttribute("svg:font-family", "&apos;Microsoft YaHei&apos;")
+        fontFace3.setAttribute("svg:font-family", "'Microsoft YaHei'")
         fontFace3.setAttribute("style:font-family-generic", "system")
         fontFace3.setAttribute("style:font-pitch", "variable")
         ####################
@@ -144,6 +144,7 @@ class Content:
         self.global_object.setGlobalInt("cellCount", cellCount)
 
     def buildTables(self):
+        self.officeSpreadsheet.clearChildren()
         for table in self.internal_tables:
             tableObject = table.tableObject()
             self.officeSpreadsheet.addChild(tableObject)

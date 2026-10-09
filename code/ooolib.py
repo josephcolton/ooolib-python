@@ -12,6 +12,8 @@ import os, sys
 # Import ooolib-python modules
 import ooolibGlobal
 import ooolibFile
+import ooolibUnits
+import ooolibReader
 
 # Calc Modules
 import ooolibCalcMeta
@@ -148,6 +150,19 @@ class Draw:
         f.insertFileString("settings.xml", self.settings.toString())
         f.insertFileString("styles.xml", self.styles.toString())
         f.close()
+
+
+#################################
+# ooolib-python Document Reader #
+#################################
+def openDocument(filename):
+    """Open an existing ODF document and return an ooolibReader.Document
+    for gathering information (metadata, pages, shapes, text)."""
+    return ooolibReader.Document(filename)
+
+def convertLength(length, unit="in"):
+    """Convert a length string such as '2.5in' or '30mm' to a float in unit."""
+    return ooolibUnits.convertLength(length, unit)
 
 
 ###################

@@ -6,6 +6,24 @@
 # You can contact me by email at josephcolton@gmail.com                         #
 #################################################################################
 
+#############################
+# ooolib-python XML Escaping #
+#############################
+def escapeText(text):
+    """Escape a value for use as XML element text."""
+    text = str(text)
+    text = text.replace("&", "&amp;")
+    text = text.replace("<", "&lt;")
+    text = text.replace(">", "&gt;")
+    return text
+
+def escapeAttribute(value):
+    """Escape a value for use inside a double-quoted XML attribute."""
+    value = escapeText(value)
+    value = value.replace('"', "&quot;")
+    value = value.replace("'", "&apos;")
+    return value
+
 ############################
 # ooolib-python XML Prolog #
 ############################
@@ -73,7 +91,7 @@ class Prolog:
         # Has attributes
         for name in self.attributes:
             value = self.attributes[name]
-            attributeStr += " %s=\"%s\"" % (name, value)
+            attributeStr += " %s=\"%s\"" % (name, escapeAttribute(value))
         # Return attribute string
         return attributeStr
 
@@ -176,7 +194,7 @@ class Element:
         # Has attributes
         for name in self.attributes:
             value = self.attributes[name]
-            attributeStr += " %s=\"%s\"" % (name, value)
+            attributeStr += " %s=\"%s\"" % (name, escapeAttribute(value))
         # Return attribute string
         return attributeStr
 
@@ -199,6 +217,10 @@ class Element:
         self.children.remove(child)
         # Return child
         return child
+
+    def clearChildren(self):
+        # Remove all children
+        self.children = None
 
     def removeChildIndex(self, index):
         # Only remove children if they exist

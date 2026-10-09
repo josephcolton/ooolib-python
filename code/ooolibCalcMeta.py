@@ -57,29 +57,29 @@ class Meta:
         if self.metaData["title"] == None:
             self.metaData["title"] = self.officeMeta.addChild(ooolibXML.Element("dc:title"))
         # Set/reset the title
-        self.metaData["title"].setText(title)
+        self.metaData["title"].setText(ooolibXML.escapeText(title))
 
     def setSubject(self, subject):
         # Create child data
         if self.metaData["subject"] == None:
             self.metaData["subject"] = self.officeMeta.addChild(ooolibXML.Element("dc:subject"))
         # Set/reset the subject
-        self.metaData["subject"].setText(subject)
+        self.metaData["subject"].setText(ooolibXML.escapeText(subject))
 
     def setDescription(self, description):
         # Create child data
         if self.metaData["description"] == None:
             self.metaData["description"] = self.officeMeta.addChild(ooolibXML.Element("dc:description"))
         # Set/reset the description
-        self.metaData["description"].setText(description)
+        self.metaData["description"].setText(ooolibXML.escapeText(description))
 
     def addKeyword(self, keyword):
         # See if the keyword already exists
         for keywordObject in self.metaData["keywords"]:
-            if (keywordObject.getText() == keyword): return
+            if (keywordObject.getText() == ooolibXML.escapeText(keyword)): return
         # Add the keyword object
         keywordObject = self.officeMeta.addChild(ooolibXML.Element("meta:keyword"))
-        keywordObject.setText(keyword)
+        keywordObject.setText(ooolibXML.escapeText(keyword))
         self.metaData["keywords"].append(keywordObject)
 
     ##################
