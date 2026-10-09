@@ -46,6 +46,28 @@ def convertLength(length, unit="in", defaultUnit="in"):
     if unit not in UNITS_PER_INCH: return None
     return value / UNITS_PER_INCH[fromUnit] * UNITS_PER_INCH[unit]
 
+def isUnit(unit):
+    return unit in UNITS_PER_INCH
+
+def formatNumber(value):
+    """Format a number without trailing zeros (2.50 -> '2.5', 3.0 -> '3')."""
+    text = "%.4f" % value
+    text = text.rstrip("0").rstrip(".")
+    if text == "-0": text = "0"
+    return text
+
+def formatLength(value, unit="in"):
+    """Return an ODF length string.
+
+    Numbers are given the unit (2.5 -> '2.5in'). Strings are returned
+    unchanged ('30mm' stays '30mm'). None is returned as None."""
+    if value is None: return None
+    if isinstance(value, bool):
+        raise TypeError("Length must be a number or string, not %r" % value)
+    if isinstance(value, (int, float)):
+        return formatNumber(value) + unit
+    return str(value)
+
 
 ###################
 # Execute to Test #
@@ -55,3 +77,5 @@ if __name__ == "__main__":
     print(convertLength("25.4mm", "in"))   # 1.0
     print(convertLength("72pt", "in"))     # 1.0
     print(convertLength("3", "mm"))        # 76.2
+    print(formatLength(2.50, "in"))        # 2.5in
+    print(formatLength("30mm", "in"))      # 30mm

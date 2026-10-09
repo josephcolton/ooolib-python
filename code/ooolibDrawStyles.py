@@ -8,6 +8,7 @@
 
 # Import ooolib-python modules
 import ooolibGlobal
+import ooolibUnits
 import ooolibXML
 
 ##################################
@@ -81,14 +82,9 @@ class Styles:
         # Page layout: 10" x 7.5"
         pageLayout = officeAutomaticStyles.addChild(ooolibXML.Element("style:page-layout"))
         pageLayout.setAttribute("style:name", "pm1")
-        pageLayoutProp = pageLayout.addChild(ooolibXML.Element("style:page-layout-properties"))
-        pageLayoutProp.setAttribute("fo:page-width", "10in")
-        pageLayoutProp.setAttribute("fo:page-height", "7.5in")
-        pageLayoutProp.setAttribute("style:print-orientation", "landscape")
-        pageLayoutProp.setAttribute("fo:margin-top", "0.5in")
-        pageLayoutProp.setAttribute("fo:margin-bottom", "0.5in")
-        pageLayoutProp.setAttribute("fo:margin-left", "0.5in")
-        pageLayoutProp.setAttribute("fo:margin-right", "0.5in")
+        self.pageLayoutProp = pageLayout.addChild(ooolibXML.Element("style:page-layout-properties"))
+        self.setPageSize("10in", "7.5in")
+        self.setPageMargins("0.5in")
 
         ########################
         # Office Master Styles #
@@ -98,6 +94,44 @@ class Styles:
         masterPage.setAttribute("style:name", "Default")
         masterPage.setAttribute("style:page-layout-name", "pm1")
         masterPage.setAttribute("draw:style-name", "dp1")
+
+    ##############
+    # Page Setup #
+    ##############
+    def setPageSize(self, width, height, orientation=None):
+        """Set the size of every page. Numbers use the document unit (see Content.setUnit).
+
+        orientation is 'landscape' or 'portrait'; by default it is worked out from the size."""
+        unit = self.global_object.getGlobalString("drawUnit", "in")
+        width = ooolibUnits.formatLength(width, unit)
+        height = ooolibUnits.formatLength(height, unit)
+        if orientation is None:
+            widthIn = ooolibUnits.convertLength(width, "in")
+            heightIn = ooolibUnits.convertLength(height, "in")
+            if widthIn is not None and heightIn is not None and widthIn < heightIn:
+                orientation = "portrait"
+            else:
+                orientation = "landscape"
+        if orientation not in ("landscape", "portrait"):
+            raise ValueError("orientation must be 'landscape' or 'portrait', not %r" % orientation)
+        self.pageLayoutProp.setAttribute("fo:page-width", width)
+        self.pageLayoutProp.setAttribute("fo:page-height", height)
+        self.pageLayoutProp.setAttribute("style:print-orientation", orientation)
+
+    def setPageMargins(self, margin=None, top=None, bottom=None, left=None, right=None):
+        """Set the page margins. margin sets all four; top/bottom/left/right override it.
+        Numbers use the document unit (see Content.setUnit)."""
+        unit = self.global_object.getGlobalString("drawUnit", "in")
+        sides = (("top", top), ("bottom", bottom), ("left", left), ("right", right))
+        for side, value in sides:
+            if value is None: value = margin
+            if value is None: continue
+            self.pageLayoutProp.setAttribute("fo:margin-%s" % side, ooolibUnits.formatLength(value, unit))
+
+    def getPageSize(self):
+        """Return (width, height) as strings, e.g. ('10in', '7.5in')."""
+        return (self.pageLayoutProp.getAttribute("fo:page-width"),
+                self.pageLayoutProp.getAttribute("fo:page-height"))
 
     def toString(self, indent=False):
         stylesString = self.prolog.toString()

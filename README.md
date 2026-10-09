@@ -388,7 +388,30 @@ doc.export("quarterly_review.odp")
 doc = ooolib.Draw()   # creates document with one blank page
 ```
 
-Default page size: 10″ × 7.5″ (landscape). All coordinates and dimension values are strings specifying a unit, such as `"1in"`, `"2.5in"`, or `"25mm"`.
+Default page size: 10″ × 7.5″ (landscape) with 0.5″ margins.
+
+### Page Setup
+
+```python
+doc.styles.setPageSize("8.5in", "11in")       # orientation is worked out from the size
+doc.styles.setPageSize("11in", "8.5in", orientation="landscape")
+doc.styles.setPageMargins("0.5in")            # all four margins
+doc.styles.setPageMargins(top="1in", left="0.75in")
+doc.styles.getPageSize()                      # ("8.5in", "11in")
+```
+
+### Units
+
+Positions and sizes can be strings with a unit (`"1in"`, `"2.5cm"`, `"25mm"`) or plain numbers. Numbers are measured in the document unit, which is inches by default:
+
+```python
+doc.content.setUnit("in")    # "in", "cm", "mm", "pt", "pc", or "px"
+doc.content.activePage.addRectangle(1, 1, 3, 2)          # same as "1in", "1in", "3in", "2in"
+doc.content.setUnit("mm")
+doc.content.activePage.addEllipse(20, 20, 50, 30)        # millimeters
+```
+
+`setUnit()` only affects shapes added after it is called. Font sizes given as numbers are always points (`fontsize=14` is `"14pt"`).
 
 ### Page Management
 
@@ -400,29 +423,47 @@ doc.content.activePage                 # the currently active page
 
 ### Shapes
 
+Every shape method returns the new shape. Shapes can be given a `name`, which LibreOffice shows in the Navigator and which `ooolib.openDocument()` reads back.
+
 ```python
 # Rectangle
 doc.content.activePage.addRectangle(x, y, width, height,
     fillcolor=None,         # e.g. "#4472c4" — None means no fill
     strokecolor=None,       # e.g. "#000000" — None means no border
-    strokewidth="0.02in")   # border thickness
+    strokewidth="0.02in",   # border thickness
+    name=None,              # shape name, e.g. "Server A"
+    text=None,              # text shown inside the shape ("\n" for a new line)
+    bold=False, italic=False, underline=False,
+    fontsize=None,          # e.g. "14pt" or 14
+    fontcolor=None,         # e.g. "#cc0000"
+    align="center")         # "left", "center", "right", or "justify"
 
-# Ellipse (also used for circles when width == height)
-doc.content.activePage.addEllipse(x, y, width, height,
-    fillcolor=None,
-    strokecolor=None,
-    strokewidth="0.02in")
+# Ellipse (also used for circles when width == height) - same options as addRectangle
+doc.content.activePage.addEllipse(x, y, width, height, fillcolor=None, strokecolor=None,
+    strokewidth="0.02in", name=None, text=None, ...)
 
 # Line
 doc.content.activePage.addLine(x1, y1, x2, y2,
     strokecolor="#000000",
-    strokewidth="0.02in")
+    strokewidth="0.02in",
+    name=None)
 
 # Text box
 doc.content.activePage.addTextBox(x, y, width, height, text,
     bold=False, italic=False, underline=False,
-    fontsize=None,    # e.g. "14pt"
-    fontcolor=None)   # e.g. "#cc0000"
+    fontsize=None,    # e.g. "14pt" or 14
+    fontcolor=None,   # e.g. "#cc0000"
+    name=None,
+    align="left")
+```
+
+Text in rectangles and ellipses is centered vertically. Shapes can be found and changed after they are added:
+
+```python
+box = doc.content.activePage.addRectangle(1, 1, 3, 1, name="Step 1")
+box.setText("Step 1", bold=True)                       # replaces the text and its formatting
+doc.content.activePage.getShape("Step 1").setName("First Step")
+doc.content.activePage.getShapes()                     # every shape on the page
 ```
 
 ### Draw Example
@@ -521,6 +562,7 @@ python calc-example08.py    # predefined named styles
 python writer-example01.py  # headings, paragraphs, text formatting
 python impress-example01.py # slides, titles, content text, background colors
 python draw-example01.py    # rectangles, ellipses, lines, text boxes
+python draw-example02.py    # page size, numeric coordinates, named shapes, text in shapes
 python read-example01.py    # read pages, shapes, and metadata from draw-example01.odg
 ```
 
