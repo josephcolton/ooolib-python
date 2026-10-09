@@ -436,17 +436,32 @@ doc.content.activePage.addRectangle(x, y, width, height,
     bold=False, italic=False, underline=False,
     fontsize=None,          # e.g. "14pt" or 14
     fontcolor=None,         # e.g. "#cc0000"
-    align="center")         # "left", "center", "right", or "justify"
+    align="center",         # "left", "center", "right", or "justify"
+    linestyle="solid",      # border style, see Line Styles below
+    rotation=None)          # degrees counterclockwise around the center
 
 # Ellipse (also used for circles when width == height) - same options as addRectangle
 doc.content.activePage.addEllipse(x, y, width, height, fillcolor=None, strokecolor=None,
     strokewidth="0.02in", name=None, text=None, ...)
 
+# Polygon - a closed shape through a list of (x, y) points, same options as addRectangle
+doc.content.activePage.addPolygon([(1, 1), (3, 1), (2, 3)],
+    fillcolor="#ffd966", strokecolor="#bf9000", text="Triangle", rotation=None, ...)
+
 # Line
 doc.content.activePage.addLine(x1, y1, x2, y2,
     strokecolor="#000000",
     strokewidth="0.02in",
-    name=None)
+    name=None,
+    linestyle="solid",
+    startarrow=None,        # line ends: None, "arrow", "circle", "square", or "diamond"
+    endarrow=None,
+    arrowsize=None)         # width of the line ends; default scales with strokewidth
+
+# Polyline - an open line through a list of (x, y) points
+doc.content.activePage.addPolyline([(1, 1), (2, 2), (3, 1)],
+    strokecolor="#000000", strokewidth="0.02in", name=None, linestyle="solid",
+    startarrow=None, endarrow=None, arrowsize=None, rotation=None)
 
 # Text box
 doc.content.activePage.addTextBox(x, y, width, height, text,
@@ -454,16 +469,37 @@ doc.content.activePage.addTextBox(x, y, width, height, text,
     fontsize=None,    # e.g. "14pt" or 14
     fontcolor=None,   # e.g. "#cc0000"
     name=None,
-    align="left")
+    align="left",
+    rotation=None)
 ```
 
-Text in rectangles and ellipses is centered vertically. Shapes can be found and changed after they are added:
+Text in rectangles, ellipses, and polygons is centered vertically. Shapes can be found and changed after they are added:
 
 ```python
 box = doc.content.activePage.addRectangle(1, 1, 3, 1, name="Step 1")
 box.setText("Step 1", bold=True)                       # replaces the text and its formatting
+box.setRotation(45)                                    # None removes the rotation
 doc.content.activePage.getShape("Step 1").setName("First Step")
 doc.content.activePage.getShapes()                     # every shape on the page
+```
+
+### Line Styles
+
+`linestyle` works on lines, polylines, and the borders of rectangles, ellipses, and polygons: `"solid"`, `"dash"`, `"dot"`, `"dashdot"`, or `"longdash"`. Dash lengths scale with the line width.
+
+### Rotation
+
+`rotation` turns a shape counterclockwise around its center, in degrees, like the rotation setting in LibreOffice. Lines are not rotated; change their end points instead.
+
+### Groups
+
+Shapes in a group move and select together in LibreOffice. A group has the same add methods as a page, and groups can be nested. `getShape()` searches inside groups.
+
+```python
+group = doc.content.activePage.addGroup(name="Server")
+group.addRectangle(7, 5.5, 2, 1.2, fillcolor="#e2f0d9", text="Server")
+group.addEllipse(7.15, 5.65, 0.25, 0.25, fillcolor="#70ad47", name="Status Light")
+doc.content.activePage.getShape("Status Light")
 ```
 
 ### Draw Example
@@ -538,6 +574,11 @@ for page in doc.pages:                  # also doc.getPage("Page Two") or doc.ge
         shape.getBounds("cm")           # (x, y, width, height) as floats in any unit
         shape.fill, shape.fillColor     # resolved through the document's styles
         shape.stroke, shape.strokeColor, shape.strokeWidth
+        shape.strokeDash                # dash style name, e.g. "Dash", or None
+        shape.markerStart, shape.markerEnd   # line end names, e.g. "Arrow", or None
+        shape.rotation                  # degrees counterclockwise, or None
+        shape.getPoints("in")           # polygon/polyline points as (x, y) floats
+        shape.children                  # shapes inside a group
 
 doc.getShapes("textbox")                # every text box in the document
 ooolib.convertLength("2.54cm", "in")    # 1.0 (units: in, cm, mm, pt, pc, px)
@@ -563,8 +604,23 @@ python writer-example01.py  # headings, paragraphs, text formatting
 python impress-example01.py # slides, titles, content text, background colors
 python draw-example01.py    # rectangles, ellipses, lines, text boxes
 python draw-example02.py    # page size, numeric coordinates, named shapes, text in shapes
+python draw-example03.py    # polygons, polylines, arrows, dashed lines, rotation, groups
 python read-example01.py    # read pages, shapes, and metadata from draw-example01.odg
 ```
+
+---
+
+## Running the Tests
+
+The tests use only the Python standard library. Run them from the repository root:
+
+```
+python3 -m unittest discover tests            # every test
+python3 -m unittest discover tests -k Draw    # tests whose names match "Draw"
+python3 tests/test_draw.py                    # one file
+```
+
+The tests create documents, check that they are valid ODF files, and read them back with `ooolib.openDocument()`. They also run every example script. If LibreOffice is installed, `tests/test_libreoffice.py` converts documents with `soffice` to make sure LibreOffice can open them; set `OOOLIB_SKIP_LIBREOFFICE=1` to skip those slower tests.
 
 ---
 

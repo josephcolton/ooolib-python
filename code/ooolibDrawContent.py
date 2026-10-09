@@ -6,8 +6,12 @@
 # You can contact me by email at josephcolton@gmail.com                         #
 #################################################################################
 
+# Import python modules
+import math
+
 # Import ooolib-python modules
 import ooolibGlobal
+import ooolibDrawStyles
 import ooolibUnits
 import ooolibXML
 
@@ -117,54 +121,47 @@ class AutomaticStyles:
         if val is None: return default
         return val
 
-    def getShapeStyle(self, fillcolor, strokecolor, strokewidth):
-        """Return (creating if needed) a graphic style for filled/stroked shapes."""
-        index = ("shape", fillcolor, strokecolor, strokewidth)
+    def getGraphicStyle(self, fillcolor=None, strokecolor=None, strokewidth=None, linestyle="solid",
+                        startarrow=None, endarrow=None, arrowsize=None, textMiddle=False):
+        """Return (creating if needed) a graphic style for shapes and lines."""
+        index = ("graphic", fillcolor, strokecolor, strokewidth, linestyle,
+                 startarrow, endarrow, arrowsize, textMiddle)
         if index not in self.styleObjects:
-            self.styleObjects[index] = self._createShapeStyle(fillcolor, strokecolor, strokewidth)
+            self.styleObjects[index] = self._createGraphicStyle(fillcolor, strokecolor, strokewidth, linestyle,
+                                                                startarrow, endarrow, arrowsize, textMiddle)
         return self.styleObjects[index]
 
-    def _createShapeStyle(self, fillcolor, strokecolor, strokewidth):
+    def _createGraphicStyle(self, fillcolor, strokecolor, strokewidth, linestyle,
+                            startarrow, endarrow, arrowsize, textMiddle):
         styleNum = self.global_object.incrementGlobalInt("drawStyleGraphic")
         styleName = "gr%d" % styleNum
         style = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
         style.setAttribute("style:name", styleName)
         style.setAttribute("style:family", "graphic")
         graphicProp = style.addChild(ooolibXML.Element("style:graphic-properties"))
-        graphicProp.setAttribute("draw:textarea-vertical-align", "middle")
+        if textMiddle:
+            graphicProp.setAttribute("draw:textarea-vertical-align", "middle")
         if fillcolor:
             graphicProp.setAttribute("draw:fill", "solid")
             graphicProp.setAttribute("draw:fill-color", fillcolor)
         else:
             graphicProp.setAttribute("draw:fill", "none")
         if strokecolor:
-            graphicProp.setAttribute("draw:stroke", "solid")
+            if linestyle == "solid":
+                graphicProp.setAttribute("draw:stroke", "solid")
+            else:
+                graphicProp.setAttribute("draw:stroke", "dash")
+                graphicProp.setAttribute("draw:stroke-dash", ooolibDrawStyles.LINE_STYLES[linestyle][0])
             graphicProp.setAttribute("svg:stroke-color", strokecolor)
             graphicProp.setAttribute("svg:stroke-width", strokewidth)
         else:
             graphicProp.setAttribute("draw:stroke", "none")
-        self.styleObjects[("shape", fillcolor, strokecolor, strokewidth)] = styleName
-        return styleName
-
-    def getLineStyle(self, strokecolor, strokewidth):
-        """Return (creating if needed) a graphic style for lines."""
-        index = ("line", strokecolor, strokewidth)
-        if index not in self.styleObjects:
-            self.styleObjects[index] = self._createLineStyle(strokecolor, strokewidth)
-        return self.styleObjects[index]
-
-    def _createLineStyle(self, strokecolor, strokewidth):
-        styleNum = self.global_object.incrementGlobalInt("drawStyleGraphic")
-        styleName = "gr%d" % styleNum
-        style = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
-        style.setAttribute("style:name", styleName)
-        style.setAttribute("style:family", "graphic")
-        graphicProp = style.addChild(ooolibXML.Element("style:graphic-properties"))
-        graphicProp.setAttribute("draw:fill", "none")
-        graphicProp.setAttribute("draw:stroke", "solid")
-        graphicProp.setAttribute("svg:stroke-color", strokecolor)
-        graphicProp.setAttribute("svg:stroke-width", strokewidth)
-        self.styleObjects[("line", strokecolor, strokewidth)] = styleName
+        for end, marker in (("start", startarrow), ("end", endarrow)):
+            if marker is None: continue
+            drawName, viewBox, path, centered = ooolibDrawStyles.MARKERS[marker]
+            graphicProp.setAttribute("draw:marker-%s" % end, drawName)
+            graphicProp.setAttribute("draw:marker-%s-width" % end, arrowsize)
+            graphicProp.setAttribute("draw:marker-%s-center" % end, "true" if centered else "false")
         return styleName
 
     def getTextBoxStyle(self):
@@ -272,7 +269,7 @@ class ContentShape:
     def setText(self, text, bold=False, italic=False, underline=False,
                 fontsize=None, fontcolor=None, align=None):
         """Set the text shown inside the shape, replacing any existing text."""
-        if self.type == "line":
+        if self.type in ("line", "polyline"):
             raise ValueError("Lines can not contain text")
         if align is None:
             align = self.data.get("defaultAlign")
@@ -286,6 +283,16 @@ class ContentShape:
         }
         return self
 
+    def getRotation(self):
+        return self.data.get("rotation")
+
+    def setRotation(self, rotation):
+        """Rotate the shape around its center, in degrees counterclockwise (None for no rotation)."""
+        if self.type == "line":
+            raise ValueError("Lines can not be rotated, change their end points instead")
+        self.data["rotation"] = checkRotation(rotation)
+        return self
+
     def __repr__(self):
         return "<ContentShape %s name=%r>" % (self.type, self.getName())
 
@@ -293,21 +300,42 @@ def formatFontSize(fontsize):
     """Font sizes given as numbers are in points (14 -> '14pt')."""
     return ooolibUnits.formatLength(fontsize, "pt")
 
+def checkRotation(rotation):
+    if rotation is None: return None
+    if isinstance(rotation, bool) or not isinstance(rotation, (int, float)):
+        raise TypeError("rotation must be a number of degrees, not %r" % (rotation,))
+    rotation = rotation % 360
+    if rotation == 0: return None
+    return rotation
 
-#####################
-# Content Page      #
-#####################
-class ContentPage:
-    def __init__(self, global_object, name=None):
+def checkLineStyle(linestyle):
+    if linestyle not in ooolibDrawStyles.LINE_STYLES:
+        raise ValueError("linestyle must be one of: %s" % ", ".join(ooolibDrawStyles.LINE_STYLES))
+    return linestyle
+
+def checkMarker(marker):
+    if marker is None: return None
+    if marker not in ooolibDrawStyles.MARKERS:
+        raise ValueError("Line ends must be None or one of: %s" % ", ".join(ooolibDrawStyles.MARKERS))
+    return marker
+
+def toInches(length):
+    """Convert a length string to inches, raising ValueError if it can not be converted."""
+    value = ooolibUnits.convertLength(length, "in")
+    if value is None:
+        raise ValueError("Unable to use length %r for this shape" % (length,))
+    return value
+
+
+###################
+# Shape Container #
+###################
+class ShapeContainer:
+    """Shared shape methods for pages and groups."""
+    def __init__(self, global_object):
         self.global_object = global_object
-        self.name = name
-        if self.name is None:
-            self.name = "page%d" % self.global_object.incrementGlobalInt("drawPageNumber")
         self.shapes = []
         self.automaticStylesInstance = self.global_object.getGlobalObjects("drawAutoStyles")
-
-    def getPageName(self):
-        return self.name
 
     def escapeText(self, text):
         return ooolibXML.escapeParagraphText(text)
@@ -324,65 +352,127 @@ class ContentPage:
         return shape
 
     def getShapes(self):
+        """Return the shapes directly in this page or group (groups are not expanded)."""
         return list(self.shapes)
 
-    def getShape(self, name):
-        """Return the first shape with the given name, or None."""
+    def iterShapes(self):
+        """Yield every shape, including shapes inside groups."""
         for shape in self.shapes:
+            yield shape
+            if shape.type == "group":
+                for nested in shape.iterShapes():
+                    yield nested
+
+    def getShape(self, name):
+        """Return the first shape or group with the given name (searching inside groups), or None."""
+        for shape in self.iterShapes():
             if shape.getName() == name: return shape
         return None
 
+    def addGroup(self, name=None):
+        """Add a group. Shapes added to the group move and select together in LibreOffice."""
+        return self.addShape(ContentGroup(self.global_object, name))
+
     def addRectangle(self, x, y, width, height, fillcolor=None, strokecolor=None, strokewidth="0.02in",
                      name=None, text=None, bold=False, italic=False, underline=False,
-                     fontsize=None, fontcolor=None, align="center"):
+                     fontsize=None, fontcolor=None, align="center", linestyle="solid", rotation=None):
         """Add a rectangle. Positions and sizes are numbers in the document unit or strings
         such as '1in' or '25mm'. Optional text is centered in the shape by default."""
         return self.addFilledShape("rect", x, y, width, height, fillcolor, strokecolor, strokewidth,
-                                   name, text, bold, italic, underline, fontsize, fontcolor, align)
+                                   name, text, bold, italic, underline, fontsize, fontcolor, align,
+                                   linestyle, rotation)
 
     def addEllipse(self, x, y, width, height, fillcolor=None, strokecolor=None, strokewidth="0.02in",
                    name=None, text=None, bold=False, italic=False, underline=False,
-                   fontsize=None, fontcolor=None, align="center"):
+                   fontsize=None, fontcolor=None, align="center", linestyle="solid", rotation=None):
         """Add an ellipse. Positions and sizes are numbers in the document unit or strings
         such as '1in' or '25mm'. Optional text is centered in the shape by default."""
         return self.addFilledShape("ellipse", x, y, width, height, fillcolor, strokecolor, strokewidth,
-                                   name, text, bold, italic, underline, fontsize, fontcolor, align)
+                                   name, text, bold, italic, underline, fontsize, fontcolor, align,
+                                   linestyle, rotation)
 
     def addFilledShape(self, shapeType, x, y, width, height, fillcolor, strokecolor, strokewidth,
-                       name, text, bold, italic, underline, fontsize, fontcolor, align):
+                       name, text, bold, italic, underline, fontsize, fontcolor, align,
+                       linestyle, rotation):
         shape = ContentShape(shapeType, {
             "x": self.length(x), "y": self.length(y),
             "width": self.length(width), "height": self.length(height),
             "fillcolor": fillcolor, "strokecolor": strokecolor,
-            "strokewidth": self.length(strokewidth),
+            "strokewidth": self.length(strokewidth), "linestyle": checkLineStyle(linestyle),
             "name": name, "text": None, "paraData": None, "defaultAlign": "center",
+            "rotation": None,
         })
+        shape.setRotation(rotation)
         if text is not None:
             shape.setText(text, bold, italic, underline, fontsize, fontcolor, align)
         return self.addShape(shape)
 
-    def addLine(self, x1, y1, x2, y2, strokecolor="#000000", strokewidth="0.02in", name=None):
+    def addPolygon(self, points, fillcolor=None, strokecolor=None, strokewidth="0.02in",
+                   name=None, text=None, bold=False, italic=False, underline=False,
+                   fontsize=None, fontcolor=None, align="center", linestyle="solid", rotation=None):
+        """Add a closed polygon through a list of (x, y) points, e.g. [(1, 1), (3, 1), (2, 3)].
+        Points are numbers in the document unit or strings such as '1in'."""
+        shape = ContentShape("polygon", {
+            "points": self.convertPoints(points, 3),
+            "fillcolor": fillcolor, "strokecolor": strokecolor,
+            "strokewidth": self.length(strokewidth), "linestyle": checkLineStyle(linestyle),
+            "name": name, "text": None, "paraData": None, "defaultAlign": "center",
+            "rotation": None,
+        })
+        shape.setRotation(rotation)
+        if text is not None:
+            shape.setText(text, bold, italic, underline, fontsize, fontcolor, align)
+        return self.addShape(shape)
+
+    def addPolyline(self, points, strokecolor="#000000", strokewidth="0.02in", name=None,
+                    linestyle="solid", startarrow=None, endarrow=None, arrowsize=None, rotation=None):
+        """Add an open line through a list of (x, y) points, e.g. [(1, 1), (2, 2), (3, 1)].
+        Points are numbers in the document unit or strings such as '1in'."""
+        shape = ContentShape("polyline", {
+            "points": self.convertPoints(points, 2),
+            "strokecolor": strokecolor, "strokewidth": self.length(strokewidth),
+            "linestyle": checkLineStyle(linestyle),
+            "startarrow": checkMarker(startarrow), "endarrow": checkMarker(endarrow),
+            "arrowsize": self.length(arrowsize), "name": name, "rotation": None,
+        })
+        shape.setRotation(rotation)
+        return self.addShape(shape)
+
+    def addLine(self, x1, y1, x2, y2, strokecolor="#000000", strokewidth="0.02in", name=None,
+                linestyle="solid", startarrow=None, endarrow=None, arrowsize=None):
         """Add a line from (x1,y1) to (x2,y2). Coordinates are numbers in the document unit
-        or strings such as '1in'."""
+        or strings such as '1in'. startarrow/endarrow: 'arrow', 'circle', 'square', or 'diamond'."""
         return self.addShape(ContentShape("line", {
             "x1": self.length(x1), "y1": self.length(y1),
             "x2": self.length(x2), "y2": self.length(y2),
             "strokecolor": strokecolor, "strokewidth": self.length(strokewidth),
-            "name": name,
+            "linestyle": checkLineStyle(linestyle),
+            "startarrow": checkMarker(startarrow), "endarrow": checkMarker(endarrow),
+            "arrowsize": self.length(arrowsize), "name": name,
         }))
 
     def addTextBox(self, x, y, width, height, text,
                    bold=False, italic=False, underline=False, fontsize=None, fontcolor=None,
-                   name=None, align="left"):
+                   name=None, align="left", rotation=None):
         """Add a text box at the given position. Positions and sizes are numbers in the
         document unit or strings such as '1in'."""
         shape = ContentShape("textbox", {
             "x": self.length(x), "y": self.length(y),
             "width": self.length(width), "height": self.length(height),
-            "name": name, "defaultAlign": "left",
+            "name": name, "defaultAlign": "left", "rotation": None,
         })
+        shape.setRotation(rotation)
         shape.setText(text, bold, italic, underline, fontsize, fontcolor, align)
         return self.addShape(shape)
+
+    def convertPoints(self, points, minimum):
+        points = [(self.length(x), self.length(y)) for (x, y) in points]
+        if len(points) < minimum:
+            raise ValueError("At least %d points are needed" % minimum)
+        for (x, y) in points:
+            toInches(x)
+            toInches(y)
+        return points
 
     ##################
     # XML Generation #
@@ -397,52 +487,142 @@ class ContentPage:
         p.setText(self.escapeText(text))
         return p
 
+    def setPosition(self, elem, x, y, width, height, rotation):
+        """Set svg:x/y/width/height, or a draw:transform when the shape is rotated."""
+        elem.setAttribute("svg:width", width)
+        elem.setAttribute("svg:height", height)
+        if rotation is None:
+            elem.setAttribute("svg:x", x)
+            elem.setAttribute("svg:y", y)
+            return
+        # Rotate around the shape's center: ODF rotates around the shape's
+        # top left corner, so translate that corner to keep the center in place.
+        x, y = toInches(x), toInches(y)
+        halfWidth, halfHeight = toInches(width) / 2, toInches(height) / 2
+        angle = math.radians(rotation)
+        cornerX = x + halfWidth - (halfWidth * math.cos(angle) + halfHeight * math.sin(angle))
+        cornerY = y + halfHeight - (halfHeight * math.cos(angle) - halfWidth * math.sin(angle))
+        elem.setAttribute("draw:transform", "rotate (%s) translate (%sin %sin)" % (
+            repr(angle), ooolibUnits.formatNumber(cornerX), ooolibUnits.formatNumber(cornerY)))
+
+    def setPoints(self, elem, points, rotation):
+        """Set the bounding box, view box, and points of a polygon or polyline."""
+        inches = [(toInches(x), toInches(y)) for (x, y) in points]
+        minX = min([x for (x, y) in inches])
+        minY = min([y for (x, y) in inches])
+        width = max([x for (x, y) in inches]) - minX
+        height = max([y for (x, y) in inches]) - minY
+        # View box units are thousandths of an inch
+        viewWidth = max(1, int(round(width * 1000)))
+        viewHeight = max(1, int(round(height * 1000)))
+        self.setPosition(elem, ooolibUnits.formatLength(minX, "in"), ooolibUnits.formatLength(minY, "in"),
+                         ooolibUnits.formatLength(viewWidth / 1000.0, "in"),
+                         ooolibUnits.formatLength(viewHeight / 1000.0, "in"), rotation)
+        elem.setAttribute("svg:viewBox", "0 0 %d %d" % (viewWidth, viewHeight))
+        pointStrings = ["%d,%d" % (int(round((x - minX) * 1000)), int(round((y - minY) * 1000)))
+                        for (x, y) in inches]
+        elem.setAttribute("draw:points", " ".join(pointStrings))
+
+    def buildShapes(self, parent):
+        """Add the XML elements for every shape to parent."""
+        styles = self.automaticStylesInstance
+        for shape in self.shapes:
+            shapeType = shape.type
+            data = shape.data
+
+            if shapeType == "group":
+                elem = parent.addChild(ooolibXML.Element("draw:g"))
+                if data["name"] is not None: elem.setAttribute("draw:name", data["name"])
+                shape.buildShapes(elem)
+
+            elif shapeType in ("rect", "ellipse", "polygon"):
+                styleName = styles.getGraphicStyle(data["fillcolor"], data["strokecolor"], data["strokewidth"],
+                                                   data["linestyle"], textMiddle=True)
+                elem = parent.addChild(ooolibXML.Element("draw:" + shapeType))
+                if data["name"] is not None: elem.setAttribute("draw:name", data["name"])
+                elem.setAttribute("draw:style-name", styleName)
+                if shapeType == "polygon":
+                    self.setPoints(elem, data["points"], data["rotation"])
+                else:
+                    self.setPosition(elem, data["x"], data["y"], data["width"], data["height"], data["rotation"])
+                self.addParagraph(elem, shape)
+
+            elif shapeType in ("line", "polyline"):
+                styleName = styles.getGraphicStyle(None, data["strokecolor"], data["strokewidth"],
+                                                   data["linestyle"], data["startarrow"], data["endarrow"],
+                                                   self.arrowSize(data))
+                elem = parent.addChild(ooolibXML.Element("draw:" + shapeType))
+                if data["name"] is not None: elem.setAttribute("draw:name", data["name"])
+                elem.setAttribute("draw:style-name", styleName)
+                if shapeType == "polyline":
+                    self.setPoints(elem, data["points"], data["rotation"])
+                else:
+                    elem.setAttribute("svg:x1", data["x1"])
+                    elem.setAttribute("svg:y1", data["y1"])
+                    elem.setAttribute("svg:x2", data["x2"])
+                    elem.setAttribute("svg:y2", data["y2"])
+
+            elif shapeType == "textbox":
+                styleName = styles.getTextBoxStyle()
+                frame = parent.addChild(ooolibXML.Element("draw:frame"))
+                if data["name"] is not None: frame.setAttribute("draw:name", data["name"])
+                frame.setAttribute("draw:style-name", styleName)
+                self.setPosition(frame, data["x"], data["y"], data["width"], data["height"], data["rotation"])
+                textBox = frame.addChild(ooolibXML.Element("draw:text-box"))
+                self.addParagraph(textBox, shape)
+
+    def arrowSize(self, data):
+        """Line end width: arrowsize if given, otherwise scaled from the line width."""
+        if data["startarrow"] is None and data["endarrow"] is None: return None
+        if data["arrowsize"] is not None: return data["arrowsize"]
+        strokeWidth = ooolibUnits.convertLength(data["strokewidth"], "in") or 0.02
+        return ooolibUnits.formatLength(max(0.1, strokeWidth * 4), "in")
+
+
+#################
+# Content Group #
+#################
+class ContentGroup(ShapeContainer):
+    """A group of shapes. Has the same add methods as a page."""
+    def __init__(self, global_object, name=None):
+        ShapeContainer.__init__(self, global_object)
+        self.type = "group"
+        self.data = {"name": name}
+
+    def getType(self):
+        return self.type
+
+    def getName(self):
+        return self.data.get("name")
+
+    def setName(self, name):
+        self.data["name"] = name
+        return self
+
+    def __repr__(self):
+        return "<ContentGroup name=%r shapes=%d>" % (self.getName(), len(self.shapes))
+
+
+#####################
+# Content Page      #
+#####################
+class ContentPage(ShapeContainer):
+    def __init__(self, global_object, name=None):
+        ShapeContainer.__init__(self, global_object)
+        self.name = name
+        if self.name is None:
+            self.name = "page%d" % self.global_object.incrementGlobalInt("drawPageNumber")
+
+    def getPageName(self):
+        return self.name
+
     def pageObject(self):
         """Build and return the draw:page XML element for this page."""
         page = ooolibXML.Element("draw:page")
         page.setAttribute("draw:name", self.name)
         page.setAttribute("draw:style-name", "dp1")
         page.setAttribute("draw:master-page-name", "Default")
-
-        for shape in self.shapes:
-            shapeType = shape.type
-            data = shape.data
-
-            if shapeType in ("rect", "ellipse"):
-                styleName = self.automaticStylesInstance.getShapeStyle(
-                    data["fillcolor"], data["strokecolor"], data["strokewidth"])
-                elem = page.addChild(ooolibXML.Element("draw:" + shapeType))
-                if data["name"] is not None: elem.setAttribute("draw:name", data["name"])
-                elem.setAttribute("draw:style-name", styleName)
-                elem.setAttribute("svg:x", data["x"])
-                elem.setAttribute("svg:y", data["y"])
-                elem.setAttribute("svg:width", data["width"])
-                elem.setAttribute("svg:height", data["height"])
-                self.addParagraph(elem, shape)
-
-            elif shapeType == "line":
-                styleName = self.automaticStylesInstance.getLineStyle(
-                    data["strokecolor"], data["strokewidth"])
-                elem = page.addChild(ooolibXML.Element("draw:line"))
-                if data["name"] is not None: elem.setAttribute("draw:name", data["name"])
-                elem.setAttribute("draw:style-name", styleName)
-                elem.setAttribute("svg:x1", data["x1"])
-                elem.setAttribute("svg:y1", data["y1"])
-                elem.setAttribute("svg:x2", data["x2"])
-                elem.setAttribute("svg:y2", data["y2"])
-
-            elif shapeType == "textbox":
-                styleName = self.automaticStylesInstance.getTextBoxStyle()
-                frame = page.addChild(ooolibXML.Element("draw:frame"))
-                if data["name"] is not None: frame.setAttribute("draw:name", data["name"])
-                frame.setAttribute("draw:style-name", styleName)
-                frame.setAttribute("svg:x", data["x"])
-                frame.setAttribute("svg:y", data["y"])
-                frame.setAttribute("svg:width", data["width"])
-                frame.setAttribute("svg:height", data["height"])
-                textBox = frame.addChild(ooolibXML.Element("draw:text-box"))
-                self.addParagraph(textBox, shape)
-
+        self.buildShapes(page)
         return page
 
 

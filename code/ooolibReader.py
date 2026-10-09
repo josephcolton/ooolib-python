@@ -7,6 +7,7 @@
 #################################################################################
 
 # Import python modules
+import math
 import re
 import sys
 import xml.etree.ElementTree as ElementTree
@@ -179,6 +180,7 @@ class Shape:
         self.layer = attr(element, "draw:layer")
         self.presentationClass = attr(element, "presentation:class")
         self.transform = attr(element, "draw:transform")
+        self.rotation = None
         # Position and size (strings as stored, e.g. '1.5in')
         self.x = attr(element, "svg:x")
         self.y = attr(element, "svg:y")
@@ -191,7 +193,10 @@ class Shape:
         self.y2 = attr(element, "svg:y2")
         # Geometry details
         self.points = attr(element, "draw:points")
+        self.viewBox = attr(element, "svg:viewBox")
         self.path = attr(element, "svg:d")
+        if self.transform is not None:
+            self.readTransform()
         self.geometry = None
         if self.type == "custom-shape":
             geometry = element.find(q("draw:enhanced-geometry"))
@@ -228,6 +233,10 @@ class Shape:
         if self.stroke == "none":
             self.strokeColor = None
             self.strokeWidth = None
+        # Dashes and line ends (names of the styles.xml definitions)
+        self.strokeDash = self.graphicProperties.get("draw:stroke-dash") if self.stroke == "dash" else None
+        self.markerStart = self.graphicProperties.get("draw:marker-start") or None
+        self.markerEnd = self.graphicProperties.get("draw:marker-end") or None
         # Text
         self.paragraphs = paragraphTexts(element)
         self.text = "\n".join(self.paragraphs)
@@ -235,6 +244,48 @@ class Shape:
         self.children = []
         if self.type == "group":
             self.children = readShapes(element, styleSheet)
+
+    def readTransform(self):
+        """Read the rotation from draw:transform and work out the position the
+        shape would have without rotation (the rotation is around its center)."""
+        operations = re.findall(r"([a-zA-Z]+)\s*\(([^)]*)\)", self.transform)
+        names = [name for (name, values) in operations]
+        if not names or [name for name in names if name not in ("rotate", "translate")]:
+            return # Only simple rotate/translate transforms are understood
+        angle, translateX, translateY = 0.0, 0.0, 0.0
+        for name, values in operations:
+            values = values.replace(",", " ").split()
+            if name == "rotate":
+                angle = float(values[0])
+            elif name == "translate":
+                translateX = ooolibUnits.convertLength(values[0], "in")
+                translateY = ooolibUnits.convertLength(values[1] if len(values) > 1 else "0", "in")
+        width = ooolibUnits.convertLength(self.width, "in")
+        height = ooolibUnits.convertLength(self.height, "in")
+        if None in (translateX, translateY, width, height): return
+        halfWidth, halfHeight = width / 2, height / 2
+        centerX = translateX + halfWidth * math.cos(angle) + halfHeight * math.sin(angle)
+        centerY = translateY + halfHeight * math.cos(angle) - halfWidth * math.sin(angle)
+        self.x = ooolibUnits.formatLength(centerX - halfWidth, "in")
+        self.y = ooolibUnits.formatLength(centerY - halfHeight, "in")
+        rotation = round(math.degrees(angle) % 360, 6)
+        self.rotation = None if rotation in (0, 360) else rotation
+
+    def getPoints(self, unit="in"):
+        """Return the points of a polygon or polyline as a list of (x, y) floats in unit.
+        For rotated shapes these are the points before rotation."""
+        if self.points is None or self.viewBox is None: return None
+        bounds = self.getBounds(unit)
+        viewBox = [float(value) for value in self.viewBox.split()]
+        if bounds is None or len(viewBox) != 4: return None
+        x, y, width, height = bounds
+        scaleX = width / viewBox[2] if viewBox[2] else 0
+        scaleY = height / viewBox[3] if viewBox[3] else 0
+        points = []
+        for point in self.points.split():
+            px, py = [float(value) for value in point.split(",")]
+            points.append((x + (px - viewBox[0]) * scaleX, y + (py - viewBox[1]) * scaleY))
+        return points
 
     def getLength(self, name, unit="in"):
         """Return a position or size attribute ('x', 'width', 'x1', ...) as a float in unit."""
@@ -272,7 +323,8 @@ class Shape:
             "stroke": self.stroke, "strokeColor": self.strokeColor, "strokeWidth": self.strokeWidth,
         }
         for key in ("x1", "y1", "x2", "y2", "points", "path", "geometry", "href",
-                    "layer", "presentationClass", "transform"):
+                    "layer", "presentationClass", "transform", "rotation",
+                    "strokeDash", "markerStart", "markerEnd"):
             if getattr(self, key) is not None: data[key] = getattr(self, key)
         if self.children: data["children"] = [child.toDict() for child in self.children]
         return data
