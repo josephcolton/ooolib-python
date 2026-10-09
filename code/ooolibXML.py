@@ -6,6 +6,9 @@
 # You can contact me by email at josephcolton@gmail.com                         #
 #################################################################################
 
+# Import python modules
+import re
+
 #############################
 # ooolib-python XML Escaping #
 #############################
@@ -23,6 +26,38 @@ def escapeAttribute(value):
     value = value.replace('"', "&quot;")
     value = value.replace("'", "&apos;")
     return value
+
+def escapeParagraphText(text):
+    """Escape a value for use as text:p / text:h content.
+
+    ODF collapses whitespace inside paragraphs, so tabs, line breaks, and
+    runs of spaces are converted to text:tab, text:line-break, and text:s."""
+    text = str(text).replace("\r\n", "\n").replace("\r", "\n")
+    parts = []
+    for segment in re.split(r"([\t\n])", text):
+        if segment == "\t":
+            parts.append("<text:tab/>")
+        elif segment == "\n":
+            parts.append("<text:line-break/>")
+        else:
+            parts.append(escapeSpaces(escapeText(segment)))
+    return "".join(parts)
+
+def escapeSpaces(text):
+    """Convert spaces that ODF would collapse into text:s elements."""
+    def replaceRun(match):
+        count = len(match.group(0))
+        # Spaces at the start or end of a segment are always collapsed
+        if match.start() == 0 or match.end() == len(text):
+            return spaceElement(count)
+        # One space between words is kept, extra spaces are collapsed
+        if count == 1: return " "
+        return " " + spaceElement(count - 1)
+    return re.sub(r" +", replaceRun, text)
+
+def spaceElement(count):
+    if count == 1: return "<text:s/>"
+    return "<text:s text:c=\"%d\"/>" % count
 
 ############################
 # ooolib-python XML Prolog #

@@ -7,6 +7,7 @@
 #################################################################################
 
 # Import python modules
+import re
 import sys
 import xml.etree.ElementTree as ElementTree
 
@@ -73,23 +74,37 @@ PARAGRAPH_TAGS = (q("text:p"), q("text:h"))
 ################
 # Text Helpers #
 ################
+# Placeholders for whitespace that ODF does not collapse
+KEPT_SPACE, KEPT_TAB, KEPT_BREAK = "\x00", "\x01", "\x02"
+
 def elementText(element):
-    """Return the plain text of a text:p / text:h / text:span element."""
-    parts = []
-    if element.text: parts.append(element.text)
+    """Return the plain text of a text:p / text:h / text:span element.
+
+    Whitespace is collapsed the same way LibreOffice displays it."""
+    text = rawElementText(element)
+    text = re.sub(r" {2,}", " ", text).strip(" ")
+    text = text.replace(KEPT_SPACE, " ").replace(KEPT_TAB, "\t").replace(KEPT_BREAK, "\n")
+    return text
+
+def collapseWhitespace(text):
+    if not text: return ""
+    return re.sub(r"[ \t\r\n]+", " ", text)
+
+def rawElementText(element):
+    parts = [collapseWhitespace(element.text)]
     for child in element:
         tag = child.tag
         if tag == q("text:s"):
-            parts.append(" " * int(child.get(q("text:c"), "1")))
+            parts.append(KEPT_SPACE * int(child.get(q("text:c"), "1")))
         elif tag == q("text:tab"):
-            parts.append("\t")
+            parts.append(KEPT_TAB)
         elif tag == q("text:line-break"):
-            parts.append("\n")
+            parts.append(KEPT_BREAK)
         elif tag in (q("office:annotation"), q("text:note")):
             pass # Skip comments and footnote bodies
         else:
-            parts.append(elementText(child))
-        if child.tail: parts.append(child.tail)
+            parts.append(rawElementText(child))
+        parts.append(collapseWhitespace(child.tail))
     return "".join(parts)
 
 def paragraphTexts(element):

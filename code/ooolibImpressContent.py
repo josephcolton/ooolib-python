@@ -247,15 +247,7 @@ class ContentSlide:
         self.backgroundColor = color
 
     def escapeText(self, text):
-        text = str(text)
-        text = text.replace("&", "&amp;")
-        text = text.replace("'", "&apos;")
-        text = text.replace('"', "&quot;")
-        text = text.replace("<", "&lt;")
-        text = text.replace(">", "&gt;")
-        text = text.replace("\t", "<text:tab/>")
-        text = text.replace("\n", "<text:line-break/>")
-        return text
+        return ooolibXML.escapeParagraphText(text)
 
     def slideObject(self):
         """Build and return the draw:page XML element for this slide."""

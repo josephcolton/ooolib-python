@@ -240,15 +240,7 @@ class ContentPage:
         return self.name
 
     def escapeText(self, text):
-        text = str(text)
-        text = text.replace("&", "&amp;")
-        text = text.replace("'", "&apos;")
-        text = text.replace('"', "&quot;")
-        text = text.replace("<", "&lt;")
-        text = text.replace(">", "&gt;")
-        text = text.replace("\t", "<text:tab/>")
-        text = text.replace("\n", "<text:line-break/>")
-        return text
+        return ooolibXML.escapeParagraphText(text)
 
     def addRectangle(self, x, y, width, height, fillcolor=None, strokecolor=None, strokewidth="0.02in"):
         """Add a rectangle. Coordinates and sizes are strings (e.g. '1in', '2.5in')."""

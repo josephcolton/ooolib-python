@@ -376,13 +376,11 @@ class ContentTable:
     ######################
     def convertCellRowCol2Id(self, row, col):
         chars = []
-        # Convert column into letters
+        # Convert column into letters (1 = A, 26 = Z, 27 = AA)
+        col = int(col)
         while(col > 0):
-            chValue = col % 26
-            col -= chValue
-            col = int(col / 26)
-            if chValue == 0: chValue = 26
-            ch = chr(int(chValue + 64))
+            col, chValue = divmod(col - 1, 26)
+            ch = chr(int(chValue + 65))
             chars.insert(0, ch)
         # Convert to Id
         cellId = "%s%d" % ("".join(chars), row)
@@ -407,15 +405,7 @@ class ContentTable:
         return (row, col)
 
     def escapeText(self, text):
-        text = str(text)
-        text = text.replace("&", "&amp;")
-        text = text.replace("'", "&apos;")
-        text = text.replace('"', "&quot;")
-        text = text.replace("<", "&lt;")
-        text = text.replace(">", "&gt;")
-        text = text.replace("\t", "<text:tab-stop/>")
-        text = text.replace("\n", "<text:line-break/>")
-        return text
+        return ooolibXML.escapeParagraphText(text)
 
     ####################
     # Table Management #
@@ -643,8 +633,8 @@ class ContentTable:
 
     def setCellDate(self, row, col, value):
         self.createCellCount(row, col) # Update cell count
-        # Sanitize
-        if not isinstance(value, datetime.datetime):
+        # Sanitize (datetime.datetime is a subclass of datetime.date)
+        if not isinstance(value, datetime.date):
             self.setCellText(row, col, "Date Error: "+str(value))
             return
         # Set the value
