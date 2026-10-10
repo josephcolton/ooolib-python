@@ -7,11 +7,13 @@
 """Tests for the XML, unit, and file helpers."""
 
 # Import python modules
+import struct
 import unittest
 
 # Import test helpers (also puts code/ on the path)
 import helpers
 import ooolibFile
+import ooolibImage
 import ooolibUnits
 import ooolibXML
 
@@ -65,6 +67,51 @@ class UnitsTest(unittest.TestCase):
         self.assertEqual(ooolibUnits.formatLength("30mm", "in"), "30mm")
         self.assertIsNone(ooolibUnits.formatLength(None, "in"))
         self.assertRaises(TypeError, ooolibUnits.formatLength, True, "in")
+
+
+class ImageInfoTest(unittest.TestCase):
+    def test_png(self):
+        info = ooolibImage.readImageInfo(helpers.makePNG(30, 20))
+        self.assertEqual((info["format"], info["mediaType"], info["extension"]), ("png", "image/png", "png"))
+        self.assertEqual((info["pixelWidth"], info["pixelHeight"], info["dpiX"]), (30, 20, 96))
+
+    def test_png_resolution(self):
+        info = ooolibImage.readImageInfo(helpers.makePNG(300, 150, dpi=300))
+        self.assertAlmostEqual(info["dpiX"], 300, places=1)
+        width, height = ooolibImage.getImageSize(info, "in")
+        self.assertAlmostEqual(width, 1.0, places=3)
+        self.assertAlmostEqual(height, 0.5, places=3)
+
+    def test_jpeg(self):
+        # Headers only: start of image, JFIF at 72 dpi, and a start of frame for 640 x 480
+        jfif = b"JFIF\x00\x01\x01\x01" + struct.pack(">HH", 72, 72) + b"\x00\x00"
+        frame = b"\x08" + struct.pack(">HH", 480, 640) + b"\x03" + b"\x00" * 9
+        data = (b"\xff\xd8" + b"\xff\xe0" + struct.pack(">H", len(jfif) + 2) + jfif +
+                b"\xff\xc0" + struct.pack(">H", len(frame) + 2) + frame)
+        info = ooolibImage.readImageInfo(data)
+        self.assertEqual((info["format"], info["pixelWidth"], info["pixelHeight"], info["dpiX"]), ("jpeg", 640, 480, 72))
+        self.assertEqual(info["extension"], "jpg")
+
+    def test_gif_and_bmp(self):
+        gif = ooolibImage.readImageInfo(b"GIF89a" + struct.pack("<HH", 40, 30) + b"\x00" * 10)
+        self.assertEqual((gif["format"], gif["pixelWidth"], gif["pixelHeight"]), ("gif", 40, 30))
+        bmpHeader = b"BM" + b"\x00" * 16 + struct.pack("<ii", 50, -25) + b"\x00" * 12 + struct.pack("<ii", 3780, 3780)
+        bmp = ooolibImage.readImageInfo(bmpHeader)
+        self.assertEqual((bmp["format"], bmp["pixelWidth"], bmp["pixelHeight"]), ("bmp", 50, 25))
+        self.assertAlmostEqual(bmp["dpiX"], 96, places=0)
+
+    def test_svg(self):
+        info = ooolibImage.readImageInfo(helpers.SVG)
+        self.assertEqual(ooolibImage.getImageSize(info, "in"), (2.0, 1.0))
+        viewBoxOnly = b'<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 96"/>'
+        self.assertEqual(ooolibImage.getImageSize(ooolibImage.readImageInfo(viewBoxOnly), "in"), (2.0, 1.0))
+        widthOnly = b'<svg xmlns="http://www.w3.org/2000/svg" width="40mm" viewBox="0 0 200 100"/>'
+        width, height = ooolibImage.getImageSize(ooolibImage.readImageInfo(widthOnly), "mm")
+        self.assertAlmostEqual(width, 40)
+        self.assertAlmostEqual(height, 20)
+
+    def test_unsupported(self):
+        self.assertRaises(ValueError, ooolibImage.readImageInfo, b"not an image")
 
 
 class FileTest(helpers.DocumentTestCase):

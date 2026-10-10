@@ -30,6 +30,13 @@ class SaveFile:
         else:
             self.zipArchive.writestr(filename, string, zipfile.ZIP_DEFLATED)
 
+    def insertFileBytes(self, filename, data, compress=True):
+        # Already compressed files (PNG, JPEG, GIF) are stored as they are
+        if compress:
+            self.zipArchive.writestr(filename, data, zipfile.ZIP_DEFLATED)
+        else:
+            self.zipArchive.writestr(filename, data, zipfile.ZIP_STORED)
+
     def close(self):
         self.zipArchive.close()
         

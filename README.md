@@ -502,9 +502,28 @@ group.addEllipse(7.15, 5.65, 0.25, 0.25, fillcolor="#70ad47", name="Status Light
 doc.content.activePage.getShape("Status Light")
 ```
 
+### Images
+
+PNG, JPEG, GIF, BMP, and SVG images can be added from a file name or from bytes. Each image is stored once in the document, however many times it is used.
+
+```python
+page = doc.content.activePage
+page.addImage("photo.jpg", 1, 1)                  # natural size, from the image's resolution (96 dpi if none)
+page.addImage("photo.jpg", 4, 1, width=3)         # height keeps the image's proportions
+page.addImage("photo.jpg", 1, 4, width=2, height=1)   # stretched to fit
+page.addImage(svgBytes, 4, 4,
+    name="Logo",
+    rotation=None,              # degrees counterclockwise around the center
+    strokecolor=None,           # border color, None for no border
+    strokewidth="0.02in",
+    linestyle="solid")
+```
+
+Connectors can attach to images.
+
 ### Connectors
 
-A connector joins two shapes and stays attached when the shapes are moved in LibreOffice. Shapes can be given as shape objects or by name, including shapes inside groups. Connectors attach to rectangles, ellipses, polygons, and text boxes.
+A connector joins two shapes and stays attached when the shapes are moved in LibreOffice. Shapes can be given as shape objects or by name, including shapes inside groups. Connectors attach to rectangles, ellipses, polygons, text boxes, and images.
 
 ```python
 page = doc.content.activePage
@@ -578,7 +597,9 @@ doc.type                  # "graphics", "presentation", "text" or "spreadsheet"
 doc.meta["title"]         # also subject, description, keywords, creator,
                           # creationDate, date, generator, statistics, userDefined
 doc.pageLayout            # {"width": "10in", "height": "7.5in", "orientation": ..., margins}
-doc.images                # [{"name": "Pictures/...", "size": 12345}, ...]
+doc.images                # [{"name": "Pictures/...", "size": 12345, "mediaType": "image/png",
+                          #   "pixelWidth": 640, "pixelHeight": 480}, ...]
+doc.readImage("Pictures/...")   # the image bytes (also accepts an image shape)
 doc.getText()             # all text in the document
 doc.toDict()              # everything above as plain dictionaries (JSON friendly)
 ```
@@ -590,6 +611,7 @@ for page in doc.pages:                  # also doc.getPage("Page Two") or doc.ge
     print(page.number, page.name, page.notes)
     for shape in page.getShapes():      # includes shapes inside groups
         shape.type                      # rect, ellipse, line, textbox, image, custom-shape, group, ...
+        shape.href                      # for images: the picture inside the document, e.g. "Pictures/..."
         shape.name, shape.text
         shape.x, shape.y, shape.width, shape.height   # strings as stored, e.g. "1.5in"
         shape.getBounds("cm")           # (x, y, width, height) as floats in any unit
@@ -632,6 +654,7 @@ python draw-example01.py    # rectangles, ellipses, lines, text boxes
 python draw-example02.py    # page size, numeric coordinates, named shapes, text in shapes
 python draw-example03.py    # polygons, polylines, arrows, dashed lines, rotation, groups
 python draw-example04.py    # connectors between shapes
+python draw-example05.py    # images from files and bytes, sizing, borders, rotation
 python read-example01.py    # read pages, shapes, and metadata from draw-example01.odg
 ```
 

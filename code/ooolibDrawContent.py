@@ -7,11 +7,14 @@
 #################################################################################
 
 # Import python modules
+import hashlib
 import math
+import os
 
 # Import ooolib-python modules
 import ooolibGlobal
 import ooolibDrawStyles
+import ooolibImage
 import ooolibUnits
 import ooolibXML
 
@@ -30,6 +33,9 @@ class Content:
         self.automaticStyles = ooolibXML.Element("office:automatic-styles")
         self.automaticStylesInstance = AutomaticStyles(self.global_object, self.automaticStyles)
         self.global_object.setGlobalObjects("drawAutoStyles", self.automaticStylesInstance)
+        # Pictures stored in the document
+        self.pictureStore = PictureStore()
+        self.global_object.setGlobalObjects("drawPictureStore", self.pictureStore)
         # XML structure
         self.prolog = ooolibXML.Prolog("xml")
         self.documentContent = ooolibXML.Element("office:document-content")
@@ -97,6 +103,33 @@ class Content:
         contentString = self.prolog.toString()
         contentString += self.documentContent.toString(indent)
         return contentString
+
+
+#################
+# Picture Store #
+#################
+class PictureStore:
+    """Images to be saved in the document's Pictures/ folder.
+    Each image is stored once, however many times it is used."""
+    def __init__(self):
+        self.pictures = {}
+
+    def addPicture(self, image):
+        """Add an image (file name or bytes) and return (path, image info)."""
+        if isinstance(image, (bytes, bytearray)):
+            data = bytes(image)
+        else:
+            with open(os.fspath(image), "rb") as imageFile:
+                data = imageFile.read()
+        info = ooolibImage.readImageInfo(data)
+        digest = hashlib.sha1(data).hexdigest()
+        path = "Pictures/%s.%s" % (digest, info["extension"])
+        if path not in self.pictures:
+            self.pictures[path] = {"path": path, "data": data, "mediaType": info["mediaType"]}
+        return path, info
+
+    def getPictures(self):
+        return [self.pictures[path] for path in sorted(self.pictures)]
 
 
 ####################
@@ -521,9 +554,36 @@ class ShapeContainer:
             shape = self.getShape(name)
             if shape is None:
                 raise ValueError("No shape named %r" % (name,))
-        if shape.type not in ("rect", "ellipse", "polygon", "textbox"):
-            raise ValueError("Connectors can only attach to rectangles, ellipses, polygons, and text boxes")
+        if shape.type not in ("rect", "ellipse", "polygon", "textbox", "image"):
+            raise ValueError("Connectors can only attach to rectangles, ellipses, polygons, text boxes, and images")
         return shape
+
+    def addImage(self, image, x, y, width=None, height=None, name=None, rotation=None,
+                 strokecolor=None, strokewidth="0.02in", linestyle="solid"):
+        """Add a PNG, JPEG, GIF, BMP, or SVG image from a file name or bytes.
+
+        Without width and height the image keeps its natural size (from its resolution,
+        96 dpi if it has none). With only one of them the other keeps the image's proportions.
+        strokecolor adds a border."""
+        path, info = self.global_object.getGlobalObjects("drawPictureStore").addPicture(image)
+        naturalWidth, naturalHeight = ooolibImage.getImageSize(info, "in")
+        width, height = self.length(width), self.length(height)
+        if width is None and height is None:
+            width = ooolibUnits.formatLength(naturalWidth, "in")
+            height = ooolibUnits.formatLength(naturalHeight, "in")
+        elif height is None:
+            height = ooolibUnits.formatLength(toInches(width) * naturalHeight / naturalWidth, "in")
+        elif width is None:
+            width = ooolibUnits.formatLength(toInches(height) * naturalWidth / naturalHeight, "in")
+        shape = ContentShape("image", {
+            "x": self.length(x), "y": self.length(y), "width": width, "height": height,
+            "href": path, "mediaType": info["mediaType"],
+            "pixelWidth": info["pixelWidth"], "pixelHeight": info["pixelHeight"],
+            "strokecolor": strokecolor, "strokewidth": self.length(strokewidth),
+            "linestyle": checkLineStyle(linestyle), "name": name, "rotation": None,
+        })
+        shape.setRotation(rotation)
+        return self.addShape(shape)
 
     def addTextBox(self, x, y, width, height, text,
                    bold=False, italic=False, underline=False, fontsize=None, fontcolor=None,
@@ -670,6 +730,20 @@ class ShapeContainer:
                 self.setPosition(frame, data["x"], data["y"], data["width"], data["height"], data["rotation"])
                 textBox = frame.addChild(ooolibXML.Element("draw:text-box"))
                 self.addParagraph(textBox, shape)
+
+            elif shapeType == "image":
+                styleName = styles.getGraphicStyle(None, data["strokecolor"], data["strokewidth"], data["linestyle"])
+                frame = parent.addChild(ooolibXML.Element("draw:frame"))
+                self.setNameAndId(frame, data)
+                frame.setAttribute("draw:style-name", styleName)
+                self.setPosition(frame, data["x"], data["y"], data["width"], data["height"], data["rotation"])
+                imageElement = frame.addChild(ooolibXML.Element("draw:image"))
+                imageElement.setAttribute("xlink:href", data["href"])
+                imageElement.setAttribute("xlink:type", "simple")
+                imageElement.setAttribute("xlink:show", "embed")
+                imageElement.setAttribute("xlink:actuate", "onLoad")
+                imageElement.setAttribute("draw:mime-type", data["mediaType"])
+                imageElement.addChild(ooolibXML.Element("text:p"))
 
             elif shapeType == "connector":
                 styleName = styles.getGraphicStyle(None, data["strokecolor"], data["strokewidth"],

@@ -268,6 +268,69 @@ class ConnectorTest(DrawTestCase):
         self.assertRaises(ValueError, connector.setRotation, 45)
 
 
+class ImageTest(DrawTestCase):
+    def test_image_sizes(self):
+        png = helpers.makePNG(192, 96)                      # 2in x 1in at 96 dpi
+        self.page.addImage(png, 1, 1, name="Natural")
+        self.page.addImage(png, 1, 3, width=4, name="Width")
+        self.page.addImage(png, 1, 5, height=0.5, name="Height")
+        self.page.addImage(png, 6, 1, width=1, height=3, name="Stretched")
+        self.page.addImage(helpers.makePNG(300, 300, dpi=300), 6, 5, name="High Resolution")
+        page = self.readBack().pages[0]
+        self.assertBounds(page.getShape("Natural"), (1, 1, 2, 1))
+        self.assertBounds(page.getShape("Width"), (1, 3, 4, 2))
+        self.assertBounds(page.getShape("Height"), (1, 5, 1, 0.5))
+        self.assertBounds(page.getShape("Stretched"), (6, 1, 1, 3))
+        self.assertBounds(page.getShape("High Resolution"), (6, 5, 1, 1))
+
+    def test_images_stored_once(self):
+        filename = self.path("picture.png")
+        with open(filename, "wb") as pngFile:
+            pngFile.write(helpers.makePNG(10, 10))
+        self.page.addImage(filename, 1, 1, name="From File")
+        self.page.addImage(helpers.makePNG(10, 10), 3, 1, name="From Bytes")   # same image
+        self.page.addImage(helpers.SVG, 5, 1, name="Vector")
+        info = self.readBack()
+        self.assertEqual(sorted(image["mediaType"] for image in info.images), ["image/png", "image/svg+xml"])
+        page = info.pages[0]
+        self.assertEqual(page.getShape("From File").href, page.getShape("From Bytes").href)
+        self.assertEqual(info.readImage(page.getShape("From File")), helpers.makePNG(10, 10))
+        self.assertEqual(info.readImage(page.getShape("Vector").href), helpers.SVG)
+        self.assertBounds(page.getShape("Vector"), (5, 1, 2, 1))
+        png = [image for image in info.images if image["mediaType"] == "image/png"][0]
+        self.assertEqual((png["pixelWidth"], png["pixelHeight"]), (10, 10))
+
+    def test_manifest_and_storage(self):
+        self.page.addImage(helpers.makePNG(10, 10), 1, 1)
+        self.page.addImage(helpers.SVG, 3, 1)
+        filename = self.export(self.doc, "images.odg")
+        self.export(self.doc, "again.odg") # Exporting twice must not repeat manifest entries
+        manifest = self.readZipString(self.path("again.odg"), "META-INF/manifest.xml")
+        self.assertEqual(manifest.count('manifest:media-type="image/png"'), 1)
+        self.assertEqual(manifest.count('manifest:media-type="image/svg+xml"'), 1)
+        with helpers.zipfile.ZipFile(filename) as archive:
+            pictures = {info.filename: info.compress_type for info in archive.infolist()
+                        if info.filename.startswith("Pictures/")}
+        self.assertEqual(sorted(pictures.values()), [helpers.zipfile.ZIP_STORED, helpers.zipfile.ZIP_DEFLATED])
+
+    def test_image_options(self):
+        self.page.addImage(helpers.makePNG(96, 96), 1, 1, name="Framed", strokecolor="#ff0000",
+                           linestyle="dash", rotation=30)
+        self.page.addRectangle(4, 1, 1, 1, name="Box")
+        self.page.addConnector("Framed", "Box", endarrow="arrow")
+        page = self.readBack().pages[0]
+        framed = page.getShape("Framed")
+        self.assertEqual((framed.type, framed.strokeColor, framed.strokeDash), ("image", "#ff0000", "Dash"))
+        self.assertAlmostEqual(framed.rotation, 30, places=4)
+        self.assertBounds(framed, (1, 1, 1, 1))
+        self.assertEqual([(start.name, end.name) for (start, end, connector) in page.getConnections()],
+                         [("Framed", "Box")])
+
+    def test_image_errors(self):
+        self.assertRaises(ValueError, self.page.addImage, b"not an image", 1, 1)
+        self.assertRaises(FileNotFoundError, self.page.addImage, self.path("missing.png"), 1, 1)
+
+
 class ReaderTest(DrawTestCase):
     def test_pages_and_text(self):
         self.page.addTextBox(1, 1, 3, 1, "First page")

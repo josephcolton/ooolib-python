@@ -78,9 +78,19 @@ class LibreOfficeTest(helpers.DocumentTestCase):
         group.addEllipse(5, 5, 1, 1, name="Inside", text="  two  spaces")
         # Deliberately start the connector on the left of "Triangle", which is far from "Inside"
         page.addConnector("Triangle", "Inside", startside="left", endside="top", endarrow="arrow", name="Link")
+        page.addImage(helpers.makePNG(96, 48), 6, 1, name="Picture")
+        page.addImage(helpers.SVG, 6, 3, width=1, name="Vector")
         filename = self.export(doc, "draw.odg")
         self.breakConnectorEnds(filename)
         resaved = ooolib.openDocument(self.convert(filename, "odg"))
+        # LibreOffice must have loaded both images (it keeps their size and data)
+        picture = resaved.pages[0].getShape("Picture")
+        for actual, wanted in zip(picture.getBounds("in"), (6, 1, 1, 0.5)):
+            self.assertAlmostEqual(actual, wanted, places=2)
+        self.assertEqual(resaved.readImage(picture), helpers.makePNG(96, 48))
+        vector = resaved.pages[0].getShape("Vector")
+        self.assertAlmostEqual(vector.getBounds("in")[3], 0.5, places=2)
+        self.assertEqual(resaved.readImage(vector), helpers.SVG)
         start, end, link = resaved.pages[0].getConnections()[0]
         self.assertEqual((start.name, end.name, link.startSide, link.endSide), ("Triangle", "Inside", "left", "top"))
         # LibreOffice routes connectors from the shapes; the ends must sit on the chosen sides

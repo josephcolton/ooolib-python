@@ -35,8 +35,9 @@ class ExamplesTest(helpers.DocumentTestCase):
                 before = set(os.listdir(self.tempDir))
                 self.runExample(script)
                 created = set(os.listdir(self.tempDir)) - before
-                self.assertTrue(created, "%s did not create a document" % script)
-                for filename in created:
+                documents = [filename for filename in created if filename[-4:-1] == ".od"]
+                self.assertTrue(documents, "%s did not create a document" % script)
+                for filename in documents:
                     self.assertValidODF(self.path(filename))
                     ooolib.openDocument(self.path(filename))
 

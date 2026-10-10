@@ -9,11 +9,13 @@
 # Import python modules
 import math
 import re
+import struct
 import sys
 import xml.etree.ElementTree as ElementTree
 
 # Import ooolib-python modules
 import ooolibFile
+import ooolibImage
 import ooolibUnits
 
 ##############
@@ -448,10 +450,8 @@ class Document:
             contentRoot = self.parse(readFile, "content.xml")
             stylesRoot = self.parse(readFile, "styles.xml")
             metaRoot = self.parse(readFile, "meta.xml")
-            self.images = []
-            for name in self.fileList:
-                if name.startswith("Pictures/") and not name.endswith("/"):
-                    self.images.append({"name": name, "size": readFile.getFileSize(name)})
+            manifestRoot = self.parse(readFile, "META-INF/manifest.xml")
+            self.images = self.readImages(readFile, manifestRoot)
         finally:
             readFile.close()
         # Styles
@@ -467,6 +467,36 @@ class Document:
                 self.pages.append(Page(page, self.styleSheet, number))
         masterPageName = self.pages[0].masterPageName if self.pages else None
         self.pageLayout = self.readPageLayout(stylesRoot, masterPageName)
+
+    def readImages(self, readFile, manifestRoot):
+        """Return information about every file in the Pictures/ folder."""
+        mediaTypes = {}
+        if manifestRoot is not None:
+            for entry in manifestRoot.iter(q("manifest:file-entry")):
+                mediaTypes[attr(entry, "manifest:full-path")] = attr(entry, "manifest:media-type")
+        images = []
+        for name in self.fileList:
+            if not name.startswith("Pictures/") or name.endswith("/"): continue
+            image = {"name": name, "size": readFile.getFileSize(name), "mediaType": mediaTypes.get(name),
+                     "pixelWidth": None, "pixelHeight": None}
+            try:
+                info = ooolibImage.readImageInfo(readFile.readFileBytes(name))
+                image["pixelWidth"], image["pixelHeight"] = info["pixelWidth"], info["pixelHeight"]
+                if image["mediaType"] is None: image["mediaType"] = info["mediaType"]
+            except (ValueError, ElementTree.ParseError, struct.error):
+                pass # Other formats are listed without a size
+            images.append(image)
+        return images
+
+    def readImage(self, image):
+        """Return the bytes of an embedded image, given its name ('Pictures/...') or an image Shape."""
+        name = image.href if isinstance(image, Shape) else image
+        if name is None: return None
+        readFile = ooolibFile.ReadFile(self.filename)
+        try:
+            return readFile.readFileBytes(name)
+        finally:
+            readFile.close()
 
     def parse(self, readFile, name):
         data = readFile.readFileBytes(name)

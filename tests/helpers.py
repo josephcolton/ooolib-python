@@ -13,11 +13,13 @@ Run every test from the repository root with:
 # Import python modules
 import os
 import shutil
+import struct
 import sys
 import tempfile
 import unittest
 import zipfile
 import xml.dom.minidom
+import zlib
 
 # Make the library importable
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,6 +37,21 @@ MIMETYPES = {
     ".odp": "application/vnd.oasis.opendocument.presentation",
     ".odg": "application/vnd.oasis.opendocument.graphics",
 }
+
+def makePNG(width, height, dpi=None):
+    """Return the bytes of a small solid PNG image, with an optional resolution."""
+    def chunk(chunkType, data):
+        return (struct.pack(">I", len(data)) + chunkType + data +
+                struct.pack(">I", zlib.crc32(chunkType + data) & 0xffffffff))
+    rows = (b"\x00" + b"\x44\x72\xc4" * width) * height
+    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+    if dpi is not None:
+        pixelsPerMeter = int(round(dpi / 0.0254))
+        png += chunk(b"pHYs", struct.pack(">IIB", pixelsPerMeter, pixelsPerMeter, 1))
+    return png + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
+
+SVG = (b'<svg xmlns="http://www.w3.org/2000/svg" width="2in" height="1in" viewBox="0 0 200 100">'
+       b'<rect width="200" height="100" fill="#ed7d31"/></svg>')
 
 class DocumentTestCase(unittest.TestCase):
     """Test case with a temporary directory and ODF file checks."""

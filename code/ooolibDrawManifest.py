@@ -36,6 +36,15 @@ class Manifest:
         fileEntry5 = self.manifest.addChild(ooolibXML.Element("manifest:file-entry"))
         fileEntry5.setAttribute("manifest:full-path", "settings.xml")
         fileEntry5.setAttribute("manifest:media-type", "text/xml")
+        self.fileEntries = set()
+
+    def addFileEntry(self, path, mediaType):
+        """List an extra file (such as Pictures/image.png) in the manifest once."""
+        if path in self.fileEntries: return
+        self.fileEntries.add(path)
+        fileEntry = self.manifest.addChild(ooolibXML.Element("manifest:file-entry"))
+        fileEntry.setAttribute("manifest:full-path", path)
+        fileEntry.setAttribute("manifest:media-type", mediaType)
 
     def toString(self, indent=False):
         manifestString = self.prolog.toString()
