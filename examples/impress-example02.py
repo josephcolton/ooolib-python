@@ -22,8 +22,8 @@ slide.addEllipse(5.17, 4.5, 3.0, 1.5, fillcolor="#fce4d6", strokecolor="#ed7d31"
 slide.addPolygon([(10.83, 4.5), (12.33, 6.0), (9.33, 6.0)], fillcolor="#e2f0d9",
     strokecolor="#548235", text="Polygon", fontsize=16, name="Polygon")
 
-# --- Slide 2: a diagram built from connectors and a group ---
-slide = doc.content.addSlide("Diagram")
+# --- Slide 2: a diagram built from connectors and a group (title only, no content area) ---
+slide = doc.content.addSlide("Diagram", layout="title")
 slide.setTitle("How a Request Flows")
 boxStyle = {"fillcolor": "#dae3f3", "strokecolor": "#4472c4", "strokewidth": 0.03,
             "bold": True, "fontsize": 18}
@@ -38,10 +38,11 @@ slide.addConnector("Server", "Cache", startside="right", endside="left", endarro
 slide.addConnector("Server", "Database", startside="right", endside="left", endarrow="arrow",
     linestyle="dash")
 
-# --- Slide 3: an image on a colored background ---
-slide = doc.content.addSlide("Picture")
-slide.setTitle("Images")
+# --- Slide 3: a blank slide (no title or content areas) with an image ---
+slide = doc.content.addSlide("Picture", layout="blank")
 slide.setBackgroundColor("#f2f2f2")
+slide.addTextBox(0.5, 0.5, 12.33, 1.0, "Blank slides hold only what you add",
+    fontsize=32, bold=True, fontcolor="#1f3864", align="center")
 logo = b"""<svg xmlns="http://www.w3.org/2000/svg" width="3in" height="3in" viewBox="0 0 100 100">
   <circle cx="50" cy="50" r="45" fill="#4472c4" stroke="#1f3864" stroke-width="4"/>
   <text x="50" y="62" font-size="32" text-anchor="middle" fill="white" font-family="sans-serif">ODF</text>

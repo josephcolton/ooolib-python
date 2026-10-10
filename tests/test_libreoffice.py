@@ -76,6 +76,8 @@ class LibreOfficeTest(helpers.DocumentTestCase):
         slide.addRectangle(6, 3, 2, 1, name="B", text="B")
         slide.addConnector("A", "B", startside="right", endside="left", endarrow="arrow")
         slide.addImage(helpers.makePNG(96, 96), 10, 3, name="Picture")
+        doc.content.addSlide("Title Only", layout="title").setTitle("Only a title")
+        doc.content.addSlide("Blank", layout="blank").addRectangle(1, 1, 2, 1, name="Box")
         resaved = self.convert(self.export(doc, "impress.odp"), "odp")
         # LibreOffice must keep the master page frames as placeholders, not turn them into shapes
         styles = self.readZipString(resaved, "styles.xml")
@@ -88,6 +90,13 @@ class LibreOfficeTest(helpers.DocumentTestCase):
         self.assertAlmostEqual(slide.getShape("A").rotation, 20, places=3)
         self.assertEqual([(start.name, end.name) for (start, end, connector) in slide.getConnections()], [("A", "B")])
         self.assertEqual(info.readImage(slide.getShape("Picture")), helpers.makePNG(96, 96))
+        # LibreOffice must not add title or content placeholders back to the other layouts
+        def placeholders(page):
+            return [shape.presentationClass for shape in page.shapes
+                    if shape.presentationClass in ("title", "subtitle", "outline")]
+        self.assertEqual(placeholders(info.getPage("Title Only")), ["title"])
+        self.assertEqual(placeholders(info.getPage("Blank")), [])
+        self.assertEqual([shape.name for shape in info.getPage("Blank").shapes if shape.name], ["Box"])
 
     def test_draw_survives_libreoffice_save(self):
         doc = ooolib.Draw()

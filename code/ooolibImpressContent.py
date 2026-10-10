@@ -11,6 +11,13 @@ import ooolibGlobal
 import ooolibDrawContent
 import ooolibXML
 
+# Slide layouts and the placeholder areas each one has
+LAYOUTS = {
+    "title-content": ("title", "content"),
+    "title": ("title",),
+    "blank": (),
+}
+
 ##################################
 # ooolib-python Impress Content  #
 ##################################
@@ -70,8 +77,12 @@ class Content:
         # Add initial slide
         self.activeSlide = self.addSlide()
 
-    def addSlide(self, name=None):
-        slide = ContentSlide(self.global_object, name)
+    def addSlide(self, name=None, layout="title-content"):
+        """Add a slide and make it the active slide.
+
+        layout: "title-content" (title and content areas), "title" (title only),
+        or "blank" (no title or content areas, for shapes and images)."""
+        slide = ContentSlide(self.global_object, name, layout)
         self.internal_slides.append(slide)
         self.activeSlide = slide
         return slide
@@ -156,7 +167,7 @@ class AutomaticStyles(ooolibDrawContent.AutomaticStyles):
 class ContentSlide(ooolibDrawContent.ShapeContainer):
     """A slide with a title and content area. Shapes, images, groups, and connectors
     are added with the same methods as a Draw page (addRectangle, addImage, ...)."""
-    def __init__(self, global_object, name=None):
+    def __init__(self, global_object, name=None, layout="title-content"):
         ooolibDrawContent.ShapeContainer.__init__(self, global_object)
         self.name = name
         if self.name is None:
@@ -164,16 +175,35 @@ class ContentSlide(ooolibDrawContent.ShapeContainer):
         self.title_text = ""
         self.content_lines = []  # list of (text, paraData) tuples
         self.backgroundColor = None
+        self.layout = None
+        self.setLayout(layout)
 
     def getSlideName(self):
         return self.name
 
+    def getLayout(self):
+        return self.layout
+
+    def setLayout(self, layout):
+        """Change the slide layout: "title-content", "title", or "blank"."""
+        if layout not in LAYOUTS:
+            raise ValueError("layout must be one of: %s" % ", ".join(LAYOUTS))
+        if self.title_text and "title" not in LAYOUTS[layout]:
+            raise ValueError("The %r layout has no title area, but this slide has a title" % layout)
+        if self.content_lines and "content" not in LAYOUTS[layout]:
+            raise ValueError("The %r layout has no content area, but this slide has content" % layout)
+        self.layout = layout
+
     def setTitle(self, text):
         """Set the title text for this slide."""
+        if "title" not in LAYOUTS[self.layout]:
+            raise ValueError("The %r layout has no title area" % self.layout)
         self.title_text = text
 
     def addContent(self, text, bold=False, italic=False, underline=False, fontsize=None, fontcolor=None):
         """Add a line of content text with optional formatting."""
+        if "content" not in LAYOUTS[self.layout]:
+            raise ValueError("The %r layout has no content area" % self.layout)
         paraData = {
             "bold": bold,
             "italic": italic,
@@ -205,33 +235,35 @@ class ContentSlide(ooolibDrawContent.ShapeContainer):
         page.setAttribute("draw:master-page-name", "Default")
 
         # Title frame
-        titleFrame = page.addChild(ooolibXML.Element("draw:frame"))
-        titleFrame.setAttribute("presentation:class", "title")
-        titleFrame.setAttribute("draw:layer", "layout")
-        titleFrame.setAttribute("draw:style-name", titleFrameStyle)
-        titleFrame.setAttribute("presentation:style-name", "Default-title")
-        self.setPlaceholderPosition(titleFrame, placeholders["title"])
-        titleTextBox = titleFrame.addChild(ooolibXML.Element("draw:text-box"))
-        titleP = titleTextBox.addChild(ooolibXML.Element("text:p"))
-        if self.title_text:
-            titleP.setText(self.escapeText(self.title_text))
+        if "title" in LAYOUTS[self.layout]:
+            titleFrame = page.addChild(ooolibXML.Element("draw:frame"))
+            titleFrame.setAttribute("presentation:class", "title")
+            titleFrame.setAttribute("draw:layer", "layout")
+            titleFrame.setAttribute("draw:style-name", titleFrameStyle)
+            titleFrame.setAttribute("presentation:style-name", "Default-title")
+            self.setPlaceholderPosition(titleFrame, placeholders["title"])
+            titleTextBox = titleFrame.addChild(ooolibXML.Element("draw:text-box"))
+            titleP = titleTextBox.addChild(ooolibXML.Element("text:p"))
+            if self.title_text:
+                titleP.setText(self.escapeText(self.title_text))
 
         # Content frame
-        contentFrame = page.addChild(ooolibXML.Element("draw:frame"))
-        contentFrame.setAttribute("presentation:class", "subtitle")
-        contentFrame.setAttribute("draw:layer", "layout")
-        contentFrame.setAttribute("draw:style-name", contentFrameStyle)
-        contentFrame.setAttribute("presentation:style-name", "Default-subtitle")
-        self.setPlaceholderPosition(contentFrame, placeholders["content"])
-        contentTextBox = contentFrame.addChild(ooolibXML.Element("draw:text-box"))
-        if self.content_lines:
-            for (lineText, paraData) in self.content_lines:
-                styleName = self.automaticStylesInstance.getParagraphStyle(paraData)
-                p = contentTextBox.addChild(ooolibXML.Element("text:p"))
-                p.setAttribute("text:style-name", styleName)
-                p.setText(self.escapeText(lineText))
-        else:
-            contentTextBox.addChild(ooolibXML.Element("text:p"))
+        if "content" in LAYOUTS[self.layout]:
+            contentFrame = page.addChild(ooolibXML.Element("draw:frame"))
+            contentFrame.setAttribute("presentation:class", "subtitle")
+            contentFrame.setAttribute("draw:layer", "layout")
+            contentFrame.setAttribute("draw:style-name", contentFrameStyle)
+            contentFrame.setAttribute("presentation:style-name", "Default-subtitle")
+            self.setPlaceholderPosition(contentFrame, placeholders["content"])
+            contentTextBox = contentFrame.addChild(ooolibXML.Element("draw:text-box"))
+            if self.content_lines:
+                for (lineText, paraData) in self.content_lines:
+                    styleName = self.automaticStylesInstance.getParagraphStyle(paraData)
+                    p = contentTextBox.addChild(ooolibXML.Element("text:p"))
+                    p.setAttribute("text:style-name", styleName)
+                    p.setText(self.escapeText(lineText))
+            else:
+                contentTextBox.addChild(ooolibXML.Element("text:p"))
 
         # Shapes, images, groups, and connectors added to the slide
         self.buildShapes(page)

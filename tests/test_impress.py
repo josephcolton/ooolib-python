@@ -73,6 +73,46 @@ class SlideTest(ImpressTestCase):
         self.assertNotIn("dp1", names) # dp1 is the default background style in styles.xml
 
 
+class LayoutTest(ImpressTestCase):
+    def placeholderClasses(self, slide):
+        return [shape.presentationClass for shape in slide.shapes if shape.presentationClass]
+
+    def test_layouts(self):
+        self.slide.setTitle("Normal")
+        self.doc.content.addSlide("Title Only", layout="title")
+        self.doc.content.activeSlide.setTitle("Just a title")
+        self.doc.content.addSlide("Blank", layout="blank")
+        self.doc.content.activeSlide.addRectangle(1, 1, 2, 1, name="Box")
+        info = self.readBack()
+        self.assertEqual(self.placeholderClasses(info.getPage(1)), ["title", "subtitle"])
+        self.assertEqual(self.placeholderClasses(info.getPage("Title Only")), ["title"])
+        self.assertEqual(self.placeholderClasses(info.getPage("Blank")), [])
+        self.assertEqual([shape.name for shape in info.getPage("Blank").shapes], ["Box"])
+        self.assertEqual(info.getText(), "Normal\nJust a title")
+
+    def test_setLayout(self):
+        self.assertEqual(self.slide.getLayout(), "title-content")
+        self.slide.setLayout("blank")
+        self.assertEqual(self.placeholderClasses(self.readBack().pages[0]), [])
+        self.slide.setLayout("title")
+        self.slide.setTitle("Added later")
+        self.assertEqual(self.readBack().pages[0].getText(), "Added later")
+
+    def test_layout_errors(self):
+        self.assertRaises(ValueError, self.doc.content.addSlide, layout="two-column")
+        blank = self.doc.content.addSlide(layout="blank")
+        self.assertRaises(ValueError, blank.setTitle, "No title area")
+        self.assertRaises(ValueError, blank.addContent, "No content area")
+        titleOnly = self.doc.content.addSlide(layout="title")
+        self.assertRaises(ValueError, titleOnly.addContent, "No content area")
+        # Changing layout must not silently drop a title or content
+        self.slide.setTitle("Title")
+        self.slide.addContent("Content")
+        self.assertRaises(ValueError, self.slide.setLayout, "title")
+        self.assertRaises(ValueError, self.slide.setLayout, "blank")
+        self.assertEqual(self.slide.getLayout(), "title-content")
+
+
 class SlideShapesTest(ImpressTestCase):
     def test_shapes_on_slides(self):
         self.doc.content.setUnit("cm")

@@ -326,6 +326,25 @@ doc.content.setActiveSlide("SlideName")  # switch to an existing slide by name
 doc.content.activeSlide                  # the currently active slide
 ```
 
+### Slide Layouts
+
+Each slide has a layout that decides which text areas it has:
+
+| Layout | Areas |
+|---|---|
+| `"title-content"` (default) | Title and content (`setTitle` and `addContent`) |
+| `"title"` | Title only — useful for diagrams and pictures with a heading |
+| `"blank"` | Nothing — the slide holds only the shapes and images you add |
+
+```python
+doc.content.addSlide("Diagram", layout="title")
+slide = doc.content.addSlide("Photo", layout="blank")
+slide.getLayout()                    # "blank"
+slide.setLayout("title")             # change it later
+```
+
+Unused areas are left out completely, so LibreOffice does not show "Click to add" prompts for them. Calling `setTitle()` or `addContent()` on a slide without that area raises `ValueError`, as does changing to a layout that would drop a title or content the slide already has.
+
 ### Adding Content to a Slide
 
 ```python
@@ -673,7 +692,7 @@ python calc-example07.py    # formulas (AVERAGE, MIN, MAX, SUM, SQRT, custom)
 python calc-example08.py    # predefined named styles
 python writer-example01.py  # headings, paragraphs, text formatting
 python impress-example01.py # slides, titles, content text, background colors
-python impress-example02.py # widescreen slides with shapes, connectors, groups, and images
+python impress-example02.py # widescreen slides, layouts, shapes, connectors, groups, and images
 python draw-example01.py    # rectangles, ellipses, lines, text boxes
 python draw-example02.py    # page size, numeric coordinates, named shapes, text in shapes
 python draw-example03.py    # polygons, polylines, arrows, dashed lines, rotation, groups
