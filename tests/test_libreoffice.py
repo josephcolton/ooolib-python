@@ -9,9 +9,11 @@ or when the OOOLIB_SKIP_LIBREOFFICE environment variable is set (these tests are
 
 # Import python modules
 import os
+import re
 import shutil
 import subprocess
 import unittest
+import zipfile
 
 # Import test helpers (also puts code/ on the path)
 import helpers
@@ -33,6 +35,18 @@ class LibreOfficeTest(helpers.DocumentTestCase):
         converted = os.path.join(outputDir, base + "." + outputFormat)
         self.assertTrue(os.path.exists(converted), "LibreOffice could not convert %s" % filename)
         return converted
+
+    def breakConnectorEnds(self, filename):
+        """Set every connector end point to 0 so a passing test proves LibreOffice
+        routed the connectors from the shapes they are attached to."""
+        with zipfile.ZipFile(filename) as archive:
+            files = [(info.filename, archive.read(info.filename)) for info in archive.infolist()]
+        with zipfile.ZipFile(filename, "w") as archive:
+            for name, data in files:
+                if name == "content.xml":
+                    data = re.sub(rb'(svg:[xy][12])="[^"]*"', rb'\1="0in"', data)
+                compression = zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED
+                archive.writestr(name, data, compression)
 
     def test_libreoffice_opens_every_type(self):
         documents = []
@@ -62,7 +76,18 @@ class LibreOfficeTest(helpers.DocumentTestCase):
         page.addLine(1, 5, 4, 5, name="Arrow", linestyle="dash", endarrow="arrow")
         group = page.addGroup(name="Group")
         group.addEllipse(5, 5, 1, 1, name="Inside", text="  two  spaces")
-        resaved = ooolib.openDocument(self.convert(self.export(doc, "draw.odg"), "odg"))
+        # Deliberately start the connector on the left of "Triangle", which is far from "Inside"
+        page.addConnector("Triangle", "Inside", startside="left", endside="top", endarrow="arrow", name="Link")
+        filename = self.export(doc, "draw.odg")
+        self.breakConnectorEnds(filename)
+        resaved = ooolib.openDocument(self.convert(filename, "odg"))
+        start, end, link = resaved.pages[0].getConnections()[0]
+        self.assertEqual((start.name, end.name, link.startSide, link.endSide), ("Triangle", "Inside", "left", "top"))
+        # LibreOffice routes connectors from the shapes; the ends must sit on the chosen sides
+        self.assertAlmostEqual(link.getLength("x1"), 1, places=2)
+        self.assertAlmostEqual(link.getLength("y1"), 1.75, places=2)
+        self.assertAlmostEqual(link.getLength("x2"), 5.5, places=2)
+        self.assertAlmostEqual(link.getLength("y2"), 5, places=2)
         self.assertEqual(resaved.pageLayout["orientation"], "portrait")
         rotated = resaved.pages[0].getShape("Rotated")
         self.assertAlmostEqual(rotated.rotation, 30, places=3)

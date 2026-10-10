@@ -69,6 +69,9 @@ SHAPE_TYPES = {
     "draw:g": "group",
 }
 
+# Standard glue point numbers mapped to connector sides
+GLUE_POINT_SIDES = {0: "top", 1: "right", 2: "bottom", 3: "left"}
+
 # Paragraph-level text elements
 PARAGRAPH_TAGS = (q("text:p"), q("text:h"))
 
@@ -191,6 +194,21 @@ class Shape:
         self.y1 = attr(element, "svg:y1")
         self.x2 = attr(element, "svg:x2")
         self.y2 = attr(element, "svg:y2")
+        # Connectors (startShape/endShape are filled in by the page)
+        self.connectorType = None
+        self.startShapeId = self.endShapeId = None
+        self.startGluePoint = self.endGluePoint = None
+        self.startShape = self.endShape = None
+        if self.type == "connector":
+            self.connectorType = attr(element, "draw:type", "standard")
+            self.startShapeId = attr(element, "draw:start-shape")
+            self.endShapeId = attr(element, "draw:end-shape")
+            self.startGluePoint = attr(element, "draw:start-glue-point")
+            self.endGluePoint = attr(element, "draw:end-glue-point")
+            if self.startGluePoint is not None: self.startGluePoint = int(self.startGluePoint)
+            if self.endGluePoint is not None: self.endGluePoint = int(self.endGluePoint)
+        self.startSide = GLUE_POINT_SIDES.get(self.startGluePoint)
+        self.endSide = GLUE_POINT_SIDES.get(self.endGluePoint)
         # Geometry details
         self.points = attr(element, "draw:points")
         self.viewBox = attr(element, "svg:viewBox")
@@ -324,8 +342,11 @@ class Shape:
         }
         for key in ("x1", "y1", "x2", "y2", "points", "path", "geometry", "href",
                     "layer", "presentationClass", "transform", "rotation",
-                    "strokeDash", "markerStart", "markerEnd"):
+                    "strokeDash", "markerStart", "markerEnd", "id", "connectorType",
+                    "startSide", "endSide"):
             if getattr(self, key) is not None: data[key] = getattr(self, key)
+        if self.startShape is not None: data["startShape"] = self.startShape.name or self.startShape.id
+        if self.endShape is not None: data["endShape"] = self.endShape.name or self.endShape.id
         if self.children: data["children"] = [child.toDict() for child in self.children]
         return data
 
@@ -355,6 +376,14 @@ class Page:
         self.name = attr(element, "draw:name")
         self.masterPageName = attr(element, "draw:master-page-name")
         self.shapes = readShapes(element, styleSheet)
+        # Connect connectors to the shapes they are attached to
+        shapesById = {}
+        for shape in self.iterShapes():
+            if shape.id is not None: shapesById[shape.id] = shape
+        for shape in self.iterShapes():
+            if shape.type == "connector":
+                shape.startShape = shapesById.get(shape.startShapeId)
+                shape.endShape = shapesById.get(shape.endShapeId)
         # Presentation speaker notes
         self.notes = None
         notes = element.find(q("presentation:notes"))
@@ -385,6 +414,11 @@ class Page:
     def getText(self):
         texts = [shape.text for shape in self.iterShapes() if shape.text]
         return "\n".join(texts)
+
+    def getConnections(self):
+        """Return (startShape, endShape, connector) for every connector on the page.
+        startShape or endShape is None when that end is not attached to a shape."""
+        return [(shape.startShape, shape.endShape, shape) for shape in self.getShapes("connector")]
 
     def toDict(self):
         data = {"number": self.number, "name": self.name,

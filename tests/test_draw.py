@@ -204,6 +204,70 @@ class GroupTest(DrawTestCase):
         self.assertEqual(len(page.getShapes()), 5)
 
 
+class ConnectorTest(DrawTestCase):
+    def addBoxes(self):
+        self.page.addRectangle(1, 1, 2, 1, name="A", text="A")
+        self.page.addRectangle(6, 4, 2, 1, name="B", text="B")
+        group = self.page.addGroup(name="Group")
+        group.addEllipse(1, 5, 2, 1, name="C")
+
+    def test_connections_round_trip(self):
+        self.addBoxes()
+        self.page.addConnector("A", "B", startside="right", endside="top", endarrow="arrow",
+                               name="A to B", text="calls")
+        self.page.addConnector(self.page.getShape("A"), "C", connectortype="curve", linestyle="dash")
+        connections = self.readBack().pages[0].getConnections()
+        self.assertEqual([(start.name, end.name) for (start, end, connector) in connections],
+                         [("A", "B"), ("A", "C")])
+        first = connections[0][2]
+        self.assertEqual((first.name, first.text, first.connectorType), ("A to B", "calls", "standard"))
+        self.assertEqual((first.startSide, first.endSide, first.markerEnd), ("right", "top", "Arrow"))
+        second = connections[1][2]
+        self.assertEqual((second.connectorType, second.startSide, second.endSide, second.strokeDash),
+                         ("curve", None, None, "Dash"))
+
+    def test_fallback_end_points(self):
+        self.addBoxes()
+        self.page.addConnector("A", "B", startside="bottom", endside="left", name="Explicit")
+        self.page.addConnector("A", "B", name="Automatic")
+        page = self.readBack().pages[0]
+        explicit = page.getShape("Explicit")
+        self.assertEqual([explicit.getLength(name) for name in ("x1", "y1", "x2", "y2")], [2, 2, 6, 4.5])
+        # Automatic sides face each other: B is further right than down, so right -> left
+        automatic = page.getShape("Automatic")
+        self.assertEqual([automatic.getLength(name) for name in ("x1", "y1", "x2", "y2")], [3, 1.5, 6, 4.5])
+
+    def test_rotated_shape_glue_point(self):
+        self.page.addRectangle(1, 1, 2, 1, name="Turned", rotation=90)
+        self.page.addRectangle(5, 1, 1, 1, name="Plain")
+        self.page.addConnector("Turned", "Plain", startside="right", endside="left", name="Link")
+        link = self.readBack().pages[0].getShape("Link")
+        # After a 90 degree turn the right side faces up: center (2, 1.5) moved up by half the width
+        self.assertAlmostEqual(link.getLength("x1"), 2, places=3)
+        self.assertAlmostEqual(link.getLength("y1"), 0.5, places=3)
+
+    def test_shared_ids(self):
+        self.addBoxes()
+        self.page.addConnector("A", "B")
+        self.page.addConnector("A", "C")
+        content = self.readZipString(self.export(self.doc, "ids.odg"), "content.xml")
+        self.assertEqual(content.count('draw:id="id1"'), 1) # A keeps one id for both connectors
+        self.assertIn('xml:id="id1"', content)
+        info = ooolib.openDocument(self.path("ids.odg"))
+        self.assertEqual(len([shape for shape in info.getShapes() if shape.id]), 3)
+
+    def test_connector_errors(self):
+        self.addBoxes()
+        line = self.page.addLine(0, 0, 1, 1, name="Line")
+        self.assertRaises(ValueError, self.page.addConnector, "A", "Missing")
+        self.assertRaises(ValueError, self.page.addConnector, "A", line)
+        self.assertRaises(ValueError, self.page.addConnector, "A", "Group")
+        self.assertRaises(ValueError, self.page.addConnector, "A", "B", startside="middle")
+        self.assertRaises(ValueError, self.page.addConnector, "A", "B", connectortype="zigzag")
+        connector = self.page.addConnector("A", "B")
+        self.assertRaises(ValueError, connector.setRotation, 45)
+
+
 class ReaderTest(DrawTestCase):
     def test_pages_and_text(self):
         self.page.addTextBox(1, 1, 3, 1, "First page")

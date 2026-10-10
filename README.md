@@ -502,6 +502,27 @@ group.addEllipse(7.15, 5.65, 0.25, 0.25, fillcolor="#70ad47", name="Status Light
 doc.content.activePage.getShape("Status Light")
 ```
 
+### Connectors
+
+A connector joins two shapes and stays attached when the shapes are moved in LibreOffice. Shapes can be given as shape objects or by name, including shapes inside groups. Connectors attach to rectangles, ellipses, polygons, and text boxes.
+
+```python
+page = doc.content.activePage
+page.addRectangle(1, 1, 2, 1, name="Web Server", text="Web Server")
+page.addRectangle(6, 3, 2, 1, name="Database", text="Database")
+page.addConnector("Web Server", "Database",
+    startside="right",          # "top", "right", "bottom", "left", or None to let LibreOffice choose
+    endside="top",
+    connectortype="standard",   # "standard" (right angles), "lines", "line" (straight), or "curve"
+    strokecolor="#000000", strokewidth="0.02in", linestyle="solid",
+    startarrow=None, endarrow="arrow", arrowsize=None,
+    name=None,
+    text="SQL",                 # optional label, with bold/italic/underline/fontsize/fontcolor
+    fontsize=10)
+```
+
+LibreOffice works out the connector's route when it opens the file.
+
 ### Draw Example
 
 ```python
@@ -580,6 +601,11 @@ for page in doc.pages:                  # also doc.getPage("Page Two") or doc.ge
         shape.getPoints("in")           # polygon/polyline points as (x, y) floats
         shape.children                  # shapes inside a group
 
+for startShape, endShape, connector in page.getConnections():
+    print(startShape.name, "->", endShape.name, connector.text)
+    connector.connectorType             # "standard", "lines", "line", or "curve"
+    connector.startSide, connector.endSide   # "top", "right", "bottom", "left", or None
+
 doc.getShapes("textbox")                # every text box in the document
 ooolib.convertLength("2.54cm", "in")    # 1.0 (units: in, cm, mm, pt, pc, px)
 ```
@@ -605,6 +631,7 @@ python impress-example01.py # slides, titles, content text, background colors
 python draw-example01.py    # rectangles, ellipses, lines, text boxes
 python draw-example02.py    # page size, numeric coordinates, named shapes, text in shapes
 python draw-example03.py    # polygons, polylines, arrows, dashed lines, rotation, groups
+python draw-example04.py    # connectors between shapes
 python read-example01.py    # read pages, shapes, and metadata from draw-example01.odg
 ```
 

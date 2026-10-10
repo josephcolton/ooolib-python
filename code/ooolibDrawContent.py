@@ -25,6 +25,7 @@ class Content:
         self.activePage = None
         self.global_object.setGlobalInt("drawPageNumber", 1)
         self.global_object.setGlobalString("drawUnit", "in")
+        self.global_object.setGlobalInt("drawShapeId", 1)
         # Automatic styles
         self.automaticStyles = ooolibXML.Element("office:automatic-styles")
         self.automaticStylesInstance = AutomaticStyles(self.global_object, self.automaticStyles)
@@ -103,6 +104,12 @@ class Content:
 ####################
 # Paragraph alignment names mapped to fo:text-align values
 PARAGRAPH_ALIGN = {"left": "start", "center": "center", "right": "end", "justify": "justify"}
+
+# Connector sides mapped to the standard glue point numbers every shape has
+CONNECTOR_SIDES = {"top": 0, "right": 1, "bottom": 2, "left": 3}
+
+# Connector routes: "standard" uses right angles, "lines" uses straight segments
+CONNECTOR_TYPES = ("standard", "lines", "line", "curve")
 
 class AutomaticStyles:
     def __init__(self, global_object, automaticStyles):
@@ -288,10 +295,34 @@ class ContentShape:
 
     def setRotation(self, rotation):
         """Rotate the shape around its center, in degrees counterclockwise (None for no rotation)."""
-        if self.type == "line":
+        if self.type in ("line", "connector"):
             raise ValueError("Lines can not be rotated, change their end points instead")
         self.data["rotation"] = checkRotation(rotation)
         return self
+
+    def getBounds(self):
+        """Return (x, y, width, height) in inches, before rotation."""
+        if self.type == "polygon":
+            inches = [(toInches(x), toInches(y)) for (x, y) in self.data["points"]]
+            xs = [x for (x, y) in inches]
+            ys = [y for (x, y) in inches]
+            return (min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys))
+        return (toInches(self.data["x"]), toInches(self.data["y"]),
+                toInches(self.data["width"]), toInches(self.data["height"]))
+
+    def getGluePoint(self, side):
+        """Return the (x, y) position in inches of the middle of a side, including rotation."""
+        x, y, width, height = self.getBounds()
+        centerX, centerY = x + width / 2, y + height / 2
+        offsets = {"top": (0, -height / 2), "right": (width / 2, 0),
+                   "bottom": (0, height / 2), "left": (-width / 2, 0)}
+        offsetX, offsetY = offsets[side]
+        rotation = self.data.get("rotation")
+        if rotation:
+            angle = math.radians(rotation)
+            offsetX, offsetY = (offsetX * math.cos(angle) + offsetY * math.sin(angle),
+                                offsetY * math.cos(angle) - offsetX * math.sin(angle))
+        return (centerX + offsetX, centerY + offsetY)
 
     def __repr__(self):
         return "<ContentShape %s name=%r>" % (self.type, self.getName())
@@ -451,6 +482,49 @@ class ShapeContainer:
             "arrowsize": self.length(arrowsize), "name": name,
         }))
 
+    def addConnector(self, startShape, endShape, startside=None, endside=None, connectortype="standard",
+                     strokecolor="#000000", strokewidth="0.02in", name=None, linestyle="solid",
+                     startarrow=None, endarrow=None, arrowsize=None, text=None,
+                     bold=False, italic=False, underline=False, fontsize=None, fontcolor=None):
+        """Add a connector between two shapes. It stays attached when the shapes are moved
+        in LibreOffice. Shapes may be given as shape objects or by name.
+
+        startside/endside: 'top', 'right', 'bottom', 'left', or None to let LibreOffice choose.
+        connectortype: 'standard' (right angles), 'lines', 'line' (straight), or 'curve'."""
+        startShape = self.findConnectable(startShape)
+        endShape = self.findConnectable(endShape)
+        for side in (startside, endside):
+            if side is not None and side not in CONNECTOR_SIDES:
+                raise ValueError("Connector sides must be None or one of: %s" % ", ".join(CONNECTOR_SIDES))
+        if connectortype not in CONNECTOR_TYPES:
+            raise ValueError("connectortype must be one of: %s" % ", ".join(CONNECTOR_TYPES))
+        for shape in (startShape, endShape):
+            if shape.data.get("id") is None:
+                shape.data["id"] = "id%d" % self.global_object.incrementGlobalInt("drawShapeId")
+        shape = ContentShape("connector", {
+            "startShape": startShape, "endShape": endShape,
+            "startside": startside, "endside": endside, "connectortype": connectortype,
+            "strokecolor": strokecolor, "strokewidth": self.length(strokewidth),
+            "linestyle": checkLineStyle(linestyle),
+            "startarrow": checkMarker(startarrow), "endarrow": checkMarker(endarrow),
+            "arrowsize": self.length(arrowsize), "name": name,
+            "text": None, "paraData": None, "defaultAlign": "center",
+        })
+        if text is not None:
+            shape.setText(text, bold, italic, underline, fontsize, fontcolor)
+        return self.addShape(shape)
+
+    def findConnectable(self, shape):
+        """Return the ContentShape for a shape object or name that a connector can attach to."""
+        if not isinstance(shape, (ContentShape, ContentGroup)):
+            name = shape
+            shape = self.getShape(name)
+            if shape is None:
+                raise ValueError("No shape named %r" % (name,))
+        if shape.type not in ("rect", "ellipse", "polygon", "textbox"):
+            raise ValueError("Connectors can only attach to rectangles, ellipses, polygons, and text boxes")
+        return shape
+
     def addTextBox(self, x, y, width, height, text,
                    bold=False, italic=False, underline=False, fontsize=None, fontcolor=None,
                    name=None, align="left", rotation=None):
@@ -523,6 +597,32 @@ class ShapeContainer:
                         for (x, y) in inches]
         elem.setAttribute("draw:points", " ".join(pointStrings))
 
+    def setNameAndId(self, elem, data):
+        if data.get("name") is not None: elem.setAttribute("draw:name", data["name"])
+        if data.get("id") is not None:
+            # draw:id for older readers, xml:id for ODF 1.2 and later
+            elem.setAttribute("draw:id", data["id"])
+            elem.setAttribute("xml:id", data["id"])
+
+    def connectorEnds(self, data):
+        """Work out connector end points in inches. LibreOffice reroutes connectors
+        when it opens the file; these points are for other ODF readers."""
+        startShape, endShape = data["startShape"], data["endShape"]
+        startSide, endSide = data["startside"], data["endside"]
+        if startSide is None or endSide is None:
+            # Pick the sides that face each other
+            startX, startY, startWidth, startHeight = startShape.getBounds()
+            endX, endY, endWidth, endHeight = endShape.getBounds()
+            deltaX = (endX + endWidth / 2) - (startX + startWidth / 2)
+            deltaY = (endY + endHeight / 2) - (startY + startHeight / 2)
+            if abs(deltaX) >= abs(deltaY):
+                facing = ("right", "left") if deltaX >= 0 else ("left", "right")
+            else:
+                facing = ("bottom", "top") if deltaY >= 0 else ("top", "bottom")
+            if startSide is None: startSide = facing[0]
+            if endSide is None: endSide = facing[1]
+        return startShape.getGluePoint(startSide) + endShape.getGluePoint(endSide)
+
     def buildShapes(self, parent):
         """Add the XML elements for every shape to parent."""
         styles = self.automaticStylesInstance
@@ -532,14 +632,14 @@ class ShapeContainer:
 
             if shapeType == "group":
                 elem = parent.addChild(ooolibXML.Element("draw:g"))
-                if data["name"] is not None: elem.setAttribute("draw:name", data["name"])
+                self.setNameAndId(elem, data)
                 shape.buildShapes(elem)
 
             elif shapeType in ("rect", "ellipse", "polygon"):
                 styleName = styles.getGraphicStyle(data["fillcolor"], data["strokecolor"], data["strokewidth"],
                                                    data["linestyle"], textMiddle=True)
                 elem = parent.addChild(ooolibXML.Element("draw:" + shapeType))
-                if data["name"] is not None: elem.setAttribute("draw:name", data["name"])
+                self.setNameAndId(elem, data)
                 elem.setAttribute("draw:style-name", styleName)
                 if shapeType == "polygon":
                     self.setPoints(elem, data["points"], data["rotation"])
@@ -552,7 +652,7 @@ class ShapeContainer:
                                                    data["linestyle"], data["startarrow"], data["endarrow"],
                                                    self.arrowSize(data))
                 elem = parent.addChild(ooolibXML.Element("draw:" + shapeType))
-                if data["name"] is not None: elem.setAttribute("draw:name", data["name"])
+                self.setNameAndId(elem, data)
                 elem.setAttribute("draw:style-name", styleName)
                 if shapeType == "polyline":
                     self.setPoints(elem, data["points"], data["rotation"])
@@ -565,11 +665,32 @@ class ShapeContainer:
             elif shapeType == "textbox":
                 styleName = styles.getTextBoxStyle()
                 frame = parent.addChild(ooolibXML.Element("draw:frame"))
-                if data["name"] is not None: frame.setAttribute("draw:name", data["name"])
+                self.setNameAndId(frame, data)
                 frame.setAttribute("draw:style-name", styleName)
                 self.setPosition(frame, data["x"], data["y"], data["width"], data["height"], data["rotation"])
                 textBox = frame.addChild(ooolibXML.Element("draw:text-box"))
                 self.addParagraph(textBox, shape)
+
+            elif shapeType == "connector":
+                styleName = styles.getGraphicStyle(None, data["strokecolor"], data["strokewidth"],
+                                                   data["linestyle"], data["startarrow"], data["endarrow"],
+                                                   self.arrowSize(data))
+                elem = parent.addChild(ooolibXML.Element("draw:connector"))
+                self.setNameAndId(elem, data)
+                elem.setAttribute("draw:style-name", styleName)
+                elem.setAttribute("draw:type", data["connectortype"])
+                x1, y1, x2, y2 = self.connectorEnds(data)
+                elem.setAttribute("svg:x1", ooolibUnits.formatLength(x1, "in"))
+                elem.setAttribute("svg:y1", ooolibUnits.formatLength(y1, "in"))
+                elem.setAttribute("svg:x2", ooolibUnits.formatLength(x2, "in"))
+                elem.setAttribute("svg:y2", ooolibUnits.formatLength(y2, "in"))
+                elem.setAttribute("draw:start-shape", data["startShape"].data["id"])
+                if data["startside"] is not None:
+                    elem.setAttribute("draw:start-glue-point", str(CONNECTOR_SIDES[data["startside"]]))
+                elem.setAttribute("draw:end-shape", data["endShape"].data["id"])
+                if data["endside"] is not None:
+                    elem.setAttribute("draw:end-glue-point", str(CONNECTOR_SIDES[data["endside"]]))
+                self.addParagraph(elem, shape)
 
     def arrowSize(self, data):
         """Line end width: arrowsize if given, otherwise scaled from the line width."""
