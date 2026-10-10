@@ -114,6 +114,9 @@ class Impress:
 
     def export(self, filename):
         self.content.updateStats()
+        pictures = self.content.pictureStore.getPictures()
+        for picture in pictures:
+            self.manifest.addFileEntry(picture["path"], picture["mediaType"])
         f = ooolibFile.SaveFile(filename)
         f.insertFileString("mimetype", "application/vnd.oasis.opendocument.presentation")
         f.insertFileString("META-INF/manifest.xml", self.manifest.toString(indent=True))
@@ -121,6 +124,8 @@ class Impress:
         f.insertFileString("content.xml", self.content.toString())
         f.insertFileString("settings.xml", self.settings.toString())
         f.insertFileString("styles.xml", self.styles.toString())
+        for picture in pictures:
+            f.insertFileBytes(picture["path"], picture["data"], compress=(picture["mediaType"] == "image/svg+xml"))
         f.close()
 
 

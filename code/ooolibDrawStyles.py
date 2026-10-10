@@ -32,6 +32,27 @@ LINE_STYLES = {
     "longdash": ("LongDash", 1, "800%", 0, None, "300%"),
 }
 
+def addLineDefinitions(officeStyles):
+    """Add the line end markers and dash styles to office:styles (Draw and Impress share them)."""
+    for markerName in MARKERS:
+        drawName, viewBox, path, centered = MARKERS[markerName]
+        marker = officeStyles.addChild(ooolibXML.Element("draw:marker"))
+        marker.setAttribute("draw:name", drawName)
+        marker.setAttribute("svg:viewBox", viewBox)
+        marker.setAttribute("svg:d", path)
+    for lineStyle in LINE_STYLES:
+        if LINE_STYLES[lineStyle] is None: continue
+        drawName, dots1, dots1Length, dots2, dots2Length, distance = LINE_STYLES[lineStyle]
+        dash = officeStyles.addChild(ooolibXML.Element("draw:stroke-dash"))
+        dash.setAttribute("draw:name", drawName)
+        dash.setAttribute("draw:style", "rect")
+        dash.setAttribute("draw:dots1", str(dots1))
+        dash.setAttribute("draw:dots1-length", dots1Length)
+        if dots2:
+            dash.setAttribute("draw:dots2", str(dots2))
+            dash.setAttribute("draw:dots2-length", dots2Length)
+        dash.setAttribute("draw:distance", distance)
+
 ##################################
 # ooolib-python Draw Styles object #
 ##################################
@@ -72,24 +93,7 @@ class Styles:
         officeStyles = self.documentStyles.addChild(ooolibXML.Element("office:styles"))
 
         # Line end markers and dash styles referenced by shape styles
-        for markerName in MARKERS:
-            drawName, viewBox, path, centered = MARKERS[markerName]
-            marker = officeStyles.addChild(ooolibXML.Element("draw:marker"))
-            marker.setAttribute("draw:name", drawName)
-            marker.setAttribute("svg:viewBox", viewBox)
-            marker.setAttribute("svg:d", path)
-        for lineStyle in LINE_STYLES:
-            if LINE_STYLES[lineStyle] is None: continue
-            drawName, dots1, dots1Length, dots2, dots2Length, distance = LINE_STYLES[lineStyle]
-            dash = officeStyles.addChild(ooolibXML.Element("draw:stroke-dash"))
-            dash.setAttribute("draw:name", drawName)
-            dash.setAttribute("draw:style", "rect")
-            dash.setAttribute("draw:dots1", str(dots1))
-            dash.setAttribute("draw:dots1-length", dots1Length)
-            if dots2:
-                dash.setAttribute("draw:dots2", str(dots2))
-                dash.setAttribute("draw:dots2-length", dots2Length)
-            dash.setAttribute("draw:distance", distance)
+        addLineDefinitions(officeStyles)
 
         # Default drawing-page style (no background)
         styleDP = officeStyles.addChild(ooolibXML.Element("style:style"))

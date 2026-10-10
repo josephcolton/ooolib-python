@@ -8,6 +8,7 @@
 
 # Import ooolib-python modules
 import ooolibGlobal
+import ooolibDrawContent
 import ooolibXML
 
 ##################################
@@ -19,15 +20,26 @@ class Content:
         self.internal_slides = []
         self.activeSlide = None
         self.global_object.setGlobalInt("impSlideNumber", 1)
+        # Slides use the Draw shape code, which keeps its settings under "draw" names
+        self.global_object.setGlobalString("drawUnit", "in")
+        self.global_object.setGlobalInt("drawShapeId", 1)
+        self.pictureStore = ooolibDrawContent.PictureStore()
+        self.global_object.setGlobalObjects("drawPictureStore", self.pictureStore)
         # Automatic styles
         self.automaticStyles = ooolibXML.Element("office:automatic-styles")
         self.automaticStylesInstance = AutomaticStyles(self.global_object, self.automaticStyles)
         self.global_object.setGlobalObjects("impAutoStyles", self.automaticStylesInstance)
+        self.global_object.setGlobalObjects("drawAutoStyles", self.automaticStylesInstance)
         # Create the two fixed frame styles used for title and content frames
         self._titleFrameStyle = self.automaticStylesInstance.createFrameStyle()
         self._contentFrameStyle = self.automaticStylesInstance.createFrameStyle()
         self.global_object.setGlobalString("impTitleFrameStyle", self._titleFrameStyle)
         self.global_object.setGlobalString("impContentFrameStyle", self._contentFrameStyle)
+        # Title and content areas for 10in x 7.5in slides (Styles.setPageSize changes them)
+        self.global_object.setGlobalObjects("impPlaceholders", {
+            "title": ("0.6in", "0.3in", "8.8in", "1.2in"),
+            "content": ("0.6in", "1.8in", "8.8in", "5.3in"),
+        })
         # XML structure
         self.prolog = ooolibXML.Prolog("xml")
         self.documentContent = ooolibXML.Element("office:document-content")
@@ -64,6 +76,10 @@ class Content:
         self.activeSlide = slide
         return slide
 
+    # Numeric positions and sizes work the same way as in Draw
+    setUnit = ooolibDrawContent.Content.setUnit
+    getUnit = ooolibDrawContent.Content.getUnit
+
     def setActiveSlide(self, name):
         for slide in self.internal_slides:
             if slide.getSlideName() == name:
@@ -90,21 +106,13 @@ class Content:
 ######################
 # Automatic Styles   #
 ######################
-class AutomaticStyles:
+class AutomaticStyles(ooolibDrawContent.AutomaticStyles):
+    """Draw's shape and paragraph styles, plus slide frame and background styles."""
     def __init__(self, global_object, automaticStyles):
-        self.global_object = global_object
-        self.officeAutomaticStyles = automaticStyles
-        self.styleObjects = {}
+        ooolibDrawContent.AutomaticStyles.__init__(self, global_object, automaticStyles)
         self.global_object.setGlobalInt("impStyleFrame", 1)
-        self.global_object.setGlobalInt("impStylePage", 1)
-        self.global_object.setGlobalInt("impStyleParagraph", 1)
-
-    def extractData(self, data, name, default=None):
-        if data == None: return default
-        if name not in data: return default
-        val = data[name]
-        if val is None: return default
-        return val
+        # dp1 is the default drawing-page style in styles.xml, so backgrounds start at dp2
+        self.global_object.setGlobalInt("impStylePage", 2)
 
     def createFrameStyle(self):
         """Create a graphic style for presentation frames (no fill, no stroke)."""
@@ -141,88 +149,21 @@ class AutomaticStyles:
         self.styleObjects[("page", bgcolor)] = pageName
         return pageName
 
-    def getParagraphStyle(self, paraData=None):
-        """Return the automatic paragraph style name for the given formatting data."""
-        has_formatting = (
-            self.extractData(paraData, "bold") or
-            self.extractData(paraData, "italic") or
-            self.extractData(paraData, "underline") or
-            self.extractData(paraData, "fontsize") is not None or
-            self.extractData(paraData, "fontcolor") is not None
-        )
-        if not has_formatting:
-            return "Standard"
-        index = ("para",
-                 self.extractData(paraData, "bold"),
-                 self.extractData(paraData, "italic"),
-                 self.extractData(paraData, "underline"),
-                 self.extractData(paraData, "fontsize"),
-                 self.extractData(paraData, "fontcolor"))
-        if index not in self.styleObjects:
-            self.styleObjects[index] = self.createParagraphStyle(paraData)
-        return self.styleObjects[index]
-
-    def createParagraphStyle(self, paraData):
-        paraNum = self.global_object.incrementGlobalInt("impStyleParagraph")
-        paraName = "P%d" % paraNum
-        styleObject = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
-        styleObject.setAttribute("style:name", paraName)
-        styleObject.setAttribute("style:family", "paragraph")
-        styleObject.setAttribute("style:parent-style-name", "Standard")
-        textProp = None
-        if self.extractData(paraData, "bold"):
-            if textProp is None: textProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
-            textProp.setAttribute("fo:font-weight", "bold")
-            textProp.setAttribute("style:font-weight-asian", "bold")
-            textProp.setAttribute("style:font-weight-complex", "bold")
-        if self.extractData(paraData, "italic"):
-            if textProp is None: textProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
-            textProp.setAttribute("fo:font-style", "italic")
-            textProp.setAttribute("style:font-style-asian", "italic")
-            textProp.setAttribute("style:font-style-complex", "italic")
-        if self.extractData(paraData, "underline"):
-            if textProp is None: textProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
-            textProp.setAttribute("style:text-underline-style", "solid")
-            textProp.setAttribute("style:text-underline-width", "auto")
-            textProp.setAttribute("style:text-underline-color", "font-color")
-        fontsize = self.extractData(paraData, "fontsize")
-        if fontsize is not None:
-            if textProp is None: textProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
-            textProp.setAttribute("fo:font-size", fontsize)
-            textProp.setAttribute("style:font-size-asian", fontsize)
-            textProp.setAttribute("style:font-size-complex", fontsize)
-        fontcolor = self.extractData(paraData, "fontcolor")
-        if fontcolor is not None:
-            if textProp is None: textProp = styleObject.addChild(ooolibXML.Element("style:text-properties"))
-            textProp.setAttribute("fo:color", fontcolor)
-        self.styleObjects[paraName] = styleObject
-        return paraName
-
 
 ######################
 # Content Slide      #
 ######################
-class ContentSlide:
-    # Title area dimensions
-    TITLE_X = "0.6in"
-    TITLE_Y = "0.3in"
-    TITLE_W = "8.8in"
-    TITLE_H = "1.2in"
-    # Content area dimensions
-    CONTENT_X = "0.6in"
-    CONTENT_Y = "1.8in"
-    CONTENT_W = "8.8in"
-    CONTENT_H = "5.3in"
-
+class ContentSlide(ooolibDrawContent.ShapeContainer):
+    """A slide with a title and content area. Shapes, images, groups, and connectors
+    are added with the same methods as a Draw page (addRectangle, addImage, ...)."""
     def __init__(self, global_object, name=None):
-        self.global_object = global_object
+        ooolibDrawContent.ShapeContainer.__init__(self, global_object)
         self.name = name
         if self.name is None:
             self.name = "Slide%d" % self.global_object.incrementGlobalInt("impSlideNumber")
         self.title_text = ""
         self.content_lines = []  # list of (text, paraData) tuples
         self.backgroundColor = None
-        self.automaticStylesInstance = self.global_object.getGlobalObjects("impAutoStyles")
 
     def getSlideName(self):
         return self.name
@@ -237,7 +178,7 @@ class ContentSlide:
             "bold": bold,
             "italic": italic,
             "underline": underline,
-            "fontsize": fontsize,
+            "fontsize": ooolibDrawContent.formatFontSize(fontsize),
             "fontcolor": fontcolor,
         }
         self.content_lines.append((text, paraData))
@@ -246,13 +187,11 @@ class ContentSlide:
         """Set the slide background to a solid color (hex string, e.g. '#336699')."""
         self.backgroundColor = color
 
-    def escapeText(self, text):
-        return ooolibXML.escapeParagraphText(text)
-
     def slideObject(self):
         """Build and return the draw:page XML element for this slide."""
         titleFrameStyle = self.global_object.getGlobalString("impTitleFrameStyle")
         contentFrameStyle = self.global_object.getGlobalString("impContentFrameStyle")
+        placeholders = self.global_object.getGlobalObjects("impPlaceholders")
 
         # Resolve drawing-page style
         if self.backgroundColor:
@@ -271,10 +210,7 @@ class ContentSlide:
         titleFrame.setAttribute("draw:layer", "layout")
         titleFrame.setAttribute("draw:style-name", titleFrameStyle)
         titleFrame.setAttribute("presentation:style-name", "Default-title")
-        titleFrame.setAttribute("svg:x", self.TITLE_X)
-        titleFrame.setAttribute("svg:y", self.TITLE_Y)
-        titleFrame.setAttribute("svg:width", self.TITLE_W)
-        titleFrame.setAttribute("svg:height", self.TITLE_H)
+        self.setPlaceholderPosition(titleFrame, placeholders["title"])
         titleTextBox = titleFrame.addChild(ooolibXML.Element("draw:text-box"))
         titleP = titleTextBox.addChild(ooolibXML.Element("text:p"))
         if self.title_text:
@@ -286,10 +222,7 @@ class ContentSlide:
         contentFrame.setAttribute("draw:layer", "layout")
         contentFrame.setAttribute("draw:style-name", contentFrameStyle)
         contentFrame.setAttribute("presentation:style-name", "Default-subtitle")
-        contentFrame.setAttribute("svg:x", self.CONTENT_X)
-        contentFrame.setAttribute("svg:y", self.CONTENT_Y)
-        contentFrame.setAttribute("svg:width", self.CONTENT_W)
-        contentFrame.setAttribute("svg:height", self.CONTENT_H)
+        self.setPlaceholderPosition(contentFrame, placeholders["content"])
         contentTextBox = contentFrame.addChild(ooolibXML.Element("draw:text-box"))
         if self.content_lines:
             for (lineText, paraData) in self.content_lines:
@@ -300,7 +233,13 @@ class ContentSlide:
         else:
             contentTextBox.addChild(ooolibXML.Element("text:p"))
 
+        # Shapes, images, groups, and connectors added to the slide
+        self.buildShapes(page)
         return page
+
+    def setPlaceholderPosition(self, frame, geometry):
+        for attribute, value in zip(("svg:x", "svg:y", "svg:width", "svg:height"), geometry):
+            frame.setAttribute(attribute, value)
 
 
 ###################

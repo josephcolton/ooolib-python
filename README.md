@@ -309,7 +309,14 @@ doc.export("project_report.odt")
 doc = ooolib.Impress()   # creates document with one blank slide
 ```
 
-Default slide size: 10″ × 7.5″ (standard 4:3 landscape).
+Default slide size: 10″ × 7.5″ (standard 4:3 landscape). To change it:
+
+```python
+doc.styles.setPageSize("13.333in", "7.5in")   # 16:9 widescreen
+doc.styles.getPageSize()                      # ("13.333in", "7.5in")
+```
+
+The title and content areas are resized to fit the new slide size.
 
 ### Slide Management
 
@@ -342,11 +349,27 @@ The `addContent` signature in full:
 ```python
 doc.content.activeSlide.addContent(text,
     bold=False, italic=False, underline=False,
-    fontsize=None,    # e.g. "28pt" (default content size is 28pt)
+    fontsize=None,    # e.g. "28pt" or 28 (default content size is 28pt)
     fontcolor=None)   # e.g. "#ffffff"
 ```
 
 Title text uses 44pt bold Liberation Sans. Content text uses 28pt Liberation Sans. These reflect the Default-title and Default-subtitle presentation styles.
+
+### Shapes, Images, and Connectors on Slides
+
+Slides have every shape method that Draw pages have: `addRectangle`, `addEllipse`, `addPolygon`, `addLine`, `addPolyline`, `addTextBox`, `addImage`, `addGroup`, `addConnector`, `getShape`, and `getShapes`. They take the same options (names, text, line styles, arrows, rotation, and so on), and `doc.content.setUnit()` sets the unit for numbers. See the [Draw](#draw--drawings) section for the details.
+
+```python
+doc.content.setUnit("in")
+slide = doc.content.addSlide("Diagram")
+slide.setTitle("How a Request Flows")
+slide.addRectangle(1, 3, 2.5, 1.2, fillcolor="#dae3f3", strokecolor="#4472c4", name="Browser", text="Browser")
+slide.addRectangle(6, 3, 2.5, 1.2, fillcolor="#dae3f3", strokecolor="#4472c4", name="Server", text="Server")
+slide.addConnector("Browser", "Server", startside="right", endside="left", endarrow="arrow")
+slide.addImage("logo.png", 8, 5.5, width=1.5)
+```
+
+Shapes are drawn on top of the title and content areas.
 
 ### Impress Example
 
@@ -650,6 +673,7 @@ python calc-example07.py    # formulas (AVERAGE, MIN, MAX, SUM, SQRT, custom)
 python calc-example08.py    # predefined named styles
 python writer-example01.py  # headings, paragraphs, text formatting
 python impress-example01.py # slides, titles, content text, background colors
+python impress-example02.py # widescreen slides with shapes, connectors, groups, and images
 python draw-example01.py    # rectangles, ellipses, lines, text boxes
 python draw-example02.py    # page size, numeric coordinates, named shapes, text in shapes
 python draw-example03.py    # polygons, polylines, arrows, dashed lines, rotation, groups

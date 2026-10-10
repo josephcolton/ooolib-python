@@ -67,6 +67,28 @@ class LibreOfficeTest(helpers.DocumentTestCase):
                 pdf = self.convert(self.export(doc, filename), "pdf")
                 self.assertGreater(os.path.getsize(pdf), 0)
 
+    def test_impress_survives_libreoffice_save(self):
+        doc = ooolib.Impress()
+        doc.styles.setPageSize("13.333in", "7.5in")
+        slide = doc.content.activeSlide
+        slide.setTitle("Title")
+        slide.addRectangle(1, 3, 2, 1, name="A", text="A", rotation=20)
+        slide.addRectangle(6, 3, 2, 1, name="B", text="B")
+        slide.addConnector("A", "B", startside="right", endside="left", endarrow="arrow")
+        slide.addImage(helpers.makePNG(96, 96), 10, 3, name="Picture")
+        resaved = self.convert(self.export(doc, "impress.odp"), "odp")
+        # LibreOffice must keep the master page frames as placeholders, not turn them into shapes
+        styles = self.readZipString(resaved, "styles.xml")
+        master = re.search(r"<style:master-page.*?</style:master-page>", styles).group(0)
+        for frame in re.findall(r"<draw:frame[^>]*>", master):
+            self.assertIn("presentation:class", frame)
+        info = ooolib.openDocument(resaved)
+        self.assertEqual(info.pageLayout["width"], "33.866cm")
+        slide = info.pages[0]
+        self.assertAlmostEqual(slide.getShape("A").rotation, 20, places=3)
+        self.assertEqual([(start.name, end.name) for (start, end, connector) in slide.getConnections()], [("A", "B")])
+        self.assertEqual(info.readImage(slide.getShape("Picture")), helpers.makePNG(96, 96))
+
     def test_draw_survives_libreoffice_save(self):
         doc = ooolib.Draw()
         page = doc.content.activePage
