@@ -8,6 +8,7 @@
 
 # Import python modules
 import datetime
+import re
 import unittest
 
 # Import test helpers (also puts code/ on the path)
@@ -102,6 +103,59 @@ class WriterTest(helpers.DocumentTestCase):
         filename = self.export(doc, "writer.odt")
         self.assertEqual(ooolib.openDocument(filename).getText(),
                          "Title & More\n  indented   gap\tTab\nline one\nline two")
+
+    def test_lists_round_trip(self):
+        doc = ooolib.Writer()
+        doc.content.addListItem("One", numbered=True)
+        doc.content.addListItem("One a", level=2)
+        doc.content.addListItem("Two", numbered=True)
+        doc.content.addParagraph("After")
+        doc.content.addListItem("Bullet")
+        filename = self.export(doc, "lists.odt")
+        self.assertEqual(ooolib.openDocument(filename).getText(), "One\nOne a\nTwo\nAfter\nBullet")
+        content = self.readZipString(filename, "content.xml")
+        # Two top level lists, the first with a nested list inside its first item
+        self.assertEqual(content.count('<text:list text:style-name="'), 3)
+        self.assertRegex(content, r'<text:list-item><text:p text:style-name="Standard">One</text:p>'
+                                  r'<text:list text:style-name="L\d+"><text:list-item>'
+                                  r'<text:p text:style-name="Standard">One a</text:p>')
+
+    def test_sub_list_kind_does_not_change_earlier_sub_lists(self):
+        doc = ooolib.Writer()
+        doc.content.addListItem("One", numbered=True)
+        doc.content.addListItem("Bullet note", level=2)
+        doc.content.addListItem("Two", numbered=True)
+        doc.content.addListItem("Sub-step", level=2, numbered=True)
+        content = doc.content.toString()
+        styles = re.findall(r'<text:list text:style-name="(L\d+)">', content)
+        self.assertEqual(len(styles), 3)
+        self.assertNotEqual(styles[1], styles[2])
+        self.assertIn('<text:list-level-style-number text:level="1"', content)
+        self.assertIn('<text:list-level-style-bullet text:level="2"', content)
+
+    def test_deep_list_item_without_parent(self):
+        doc = ooolib.Writer()
+        doc.content.addListItem("Deep", level=3)
+        filename = self.export(doc, "deep.odt")
+        content = self.readZipString(filename, "content.xml")
+        self.assertEqual(content.count("<text:list>") + content.count("<text:list "), 3)
+        self.assertEqual(ooolib.openDocument(filename).getText(), "Deep")
+
+    def test_mixed_runs_and_paragraph_layout(self):
+        doc = ooolib.Writer()
+        doc.content.addParagraph([("Rent:", {"bold": True}), " <$800> & ", ("due", {"bold": True})],
+                                 align="center", indent="0.5in", spaceAfter="0.1in", keepWithNext=True)
+        doc.content.addParagraph("Plain")
+        filename = self.export(doc, "runs.odt")
+        self.assertEqual(ooolib.openDocument(filename).getText(), "Rent: <$800> & due\nPlain")
+        content = self.readZipString(filename, "content.xml")
+        # Both bold runs share one text style
+        self.assertEqual(content.count('style:family="text"'), 1)
+        self.assertIn('<text:span text:style-name="T1">Rent:</text:span><text:s/>&lt;$800&gt; &amp;<text:s/>', content)
+        for attribute in ('fo:text-align="center"', 'fo:margin-left="0.5in"',
+                          'fo:margin-bottom="0.1in"', 'fo:keep-with-next="always"'):
+            self.assertIn(attribute, content)
+        self.assertIn('<text:p text:style-name="Standard">Plain</text:p>', content)
 
 
 class ImpressTest(helpers.DocumentTestCase):

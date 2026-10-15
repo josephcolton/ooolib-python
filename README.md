@@ -270,11 +270,35 @@ The `addParagraph` signature in full:
 ```python
 doc.content.addParagraph(text,
     bold=False, italic=False, underline=False,
-    fontsize=None,    # e.g. "12pt", "18pt"
-    fontcolor=None)   # e.g. "#cc0000"
+    fontsize=None,       # e.g. "12pt", "18pt"
+    fontcolor=None,      # e.g. "#cc0000"
+    align=None,          # "left", "center", "right", or "justify"
+    indent=None,         # left indent, e.g. "0.5in"
+    spaceBefore=None,    # e.g. "0.1in"
+    spaceAfter=None,     # e.g. "0.1in"
+    keepWithNext=False)  # keep on the same page as the next paragraph
 ```
 
-Formatting applies to the entire paragraph. The default page layout is US Letter (8.5″ × 11″) with 1″ top/bottom and 1.25″ left/right margins. The default body font is Liberation Serif 12pt.
+Formatting arguments apply to the entire paragraph. For mixed formatting, pass a list of runs instead of a string; each run is a string or a `(string, formatting)` tuple:
+
+```python
+doc.content.addParagraph([("Monthly Rent:", {"bold": True}), " $800.00, due on the ",
+                          ("first", {"italic": True}), " of each month."])
+```
+
+### Lists
+
+```python
+doc.content.addListItem("First item")                         # bulleted
+doc.content.addListItem("Nested item", level=2)               # nested under the previous item
+doc.content.addListItem("Step one", numbered=True)            # numbered (1. / a. / i.)
+doc.content.addListItem([("Label:", {"bold": True}), " text"])  # runs work here too
+doc.content.endList()                                         # the next item starts a new list
+```
+
+`addListItem` takes the same formatting arguments as `addParagraph` except `indent`. Items added one after another form one list; adding a paragraph or heading ends the list. Headings also accept a list of runs.
+
+The default page layout is US Letter (8.5″ × 11″) with 1″ top/bottom and 1.25″ left/right margins. The default body font is Liberation Serif 12pt.
 
 ### Writer Example
 
