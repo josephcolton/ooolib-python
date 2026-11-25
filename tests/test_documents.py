@@ -157,6 +157,82 @@ class WriterTest(helpers.DocumentTestCase):
             self.assertIn(attribute, content)
         self.assertIn('<text:p text:style-name="Standard">Plain</text:p>', content)
 
+    def test_font_selection(self):
+        doc = ooolib.Writer()
+        doc.styles.setDefaultFont("DejaVu Sans", "11pt")
+        doc.styles.setHeadingFont("DejaVu Serif")
+        doc.content.addParagraph("Mono", fontname="Liberation Mono")
+        doc.content.addParagraph(["Plain ", ("custom", {"fontname": "My Font"}), " text"])
+        doc.content.addListItem("Item", fontname="Liberation Mono")
+        filename = self.export(doc, "fonts.odt")
+        self.assertEqual(ooolib.openDocument(filename).getText(), "Mono\nPlain custom text\nItem")
+        content = self.readZipString(filename, "content.xml")
+        # Each font is declared once, and both paragraphs share one style
+        self.assertEqual(content.count('<style:font-face style:name="Liberation Mono"'), 1)
+        self.assertEqual(content.count('style:font-name="Liberation Mono"'), 1)
+        self.assertIn('<style:font-face style:name="My Font" svg:font-family="&apos;My Font&apos;"/>', content)
+        self.assertIn('<style:text-properties style:font-name="My Font"/>', content)
+        styles = self.readZipString(filename, "styles.xml")
+        self.assertIn('<style:font-face style:name="DejaVu Sans"', styles)
+        self.assertIn('style:font-name="DejaVu Sans" fo:font-size="11pt"', styles)
+        self.assertIn('style:font-name="DejaVu Serif"', styles)
+
+    def test_table_round_trip(self):
+        doc = ooolib.Writer()
+        doc.content.addParagraph("Before")
+        table = doc.content.addTable([["Name", "Qty"], ["A & B", "3"]], headerRows=1, bold=True)
+        table.addRow([{"text": "Total", "colspan": 2, "align": "right"}])
+        table.addRow(["Only one"])
+        doc.content.addParagraph("After")
+        filename = self.export(doc, "table.odt")
+        self.assertEqual(ooolib.openDocument(filename).getText(),
+                         "Before\nName\nQty\nA & B\n3\nTotal\nOnly one\n\nAfter")
+        content = self.readZipString(filename, "content.xml")
+        self.assertIn('xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"', content)
+        self.assertEqual(content.count("<table:table-column "), 2)
+        self.assertEqual(content.count("<table:table-row>"), 4)
+        self.assertRegex(content, r"<table:table-header-rows><table:table-row>"
+                                  r"(<table:table-cell [^>]*><text:p [^>]*>(Name|Qty)</text:p></table:table-cell>){2}"
+                                  r"</table:table-row></table:table-header-rows>")
+        self.assertIn('table:number-columns-spanned="2"><text:p', content)
+        self.assertIn("<table:covered-table-cell/>", content)
+        # Default width fills the page margins, split evenly
+        self.assertIn('<style:table-properties style:width="6in" table:align="margins"/>', content)
+        self.assertIn('style:column-width="3in"', content)
+        # Shared borders are drawn once
+        self.assertIn('fo:border="0.5pt solid #000000"', content)
+        self.assertIn('fo:border-left="none" fo:border-right="0.5pt solid #000000" '
+                      'fo:border-top="none" fo:border-bottom="0.5pt solid #000000"', content)
+        meta = self.readZipString(filename, "meta.xml")
+        self.assertIn('meta:table-count="1"', meta)
+
+    def test_table_widths_and_cell_formatting(self):
+        doc = ooolib.Writer()
+        table = doc.content.addTable(columnWidths=["2in", 1], align="center", border=None, padding="0.1in")
+        table.addRow([("Label:", {"italic": True}), {"text": "x", "background": "#dddddd", "valign": "middle"}])
+        content = doc.content.toString()
+        self.assertIn('<style:table-properties style:width="3in" table:align="center"/>', content)
+        self.assertIn('style:column-width="2in" style:rel-column-width="2000*"', content)
+        self.assertIn('style:column-width="1in" style:rel-column-width="1000*"', content)
+        self.assertIn('fo:border="none" fo:padding="0.1in" fo:background-color="#dddddd" '
+                      'style:vertical-align="middle"', content)
+        self.assertRegex(content, r'<text:span text:style-name="T\d+">Label:</text:span>')
+
+    def test_table_errors(self):
+        doc = ooolib.Writer()
+        with self.assertRaises(ValueError):
+            doc.content.addTable()
+        with self.assertRaises(ValueError):
+            doc.content.addTable(columns=2, columnWidths=["1in"])
+        table = doc.content.addTable(columns=2)
+        with self.assertRaises(ValueError):
+            table.addRow(["a", "b", "c"])
+        with self.assertRaises(TypeError):
+            table.addRow(["a"], colour="#ff0000")
+        table.addRow(["a"])
+        with self.assertRaises(ValueError):
+            table.addRow(["h"], header=True)
+
 
 class ImpressTest(helpers.DocumentTestCase):
     def test_slides_round_trip(self):

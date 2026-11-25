@@ -9,6 +9,7 @@
 # Import ooolib-python modules
 import ooolibGlobal
 import ooolibXML
+import ooolibWriterContent
 
 ##################################
 # ooolib-python Writer Styles object #
@@ -36,21 +37,10 @@ class Styles:
         # Font Face Declarations #
         #####################
         officeFonts = self.documentStyles.addChild(ooolibXML.Element("office:font-face-decls"))
-        font1 = officeFonts.addChild(ooolibXML.Element("style:font-face"))
-        font1.setAttribute("style:name", "Liberation Serif")
-        font1.setAttribute("svg:font-family", "'Liberation Serif'")
-        font1.setAttribute("style:font-family-generic", "roman")
-        font1.setAttribute("style:font-pitch", "variable")
-        font2 = officeFonts.addChild(ooolibXML.Element("style:font-face"))
-        font2.setAttribute("style:name", "Liberation Sans")
-        font2.setAttribute("svg:font-family", "'Liberation Sans'")
-        font2.setAttribute("style:font-family-generic", "swiss")
-        font2.setAttribute("style:font-pitch", "variable")
-        font3 = officeFonts.addChild(ooolibXML.Element("style:font-face"))
-        font3.setAttribute("style:name", "Liberation Mono")
-        font3.setAttribute("svg:font-family", "'Liberation Mono'")
-        font3.setAttribute("style:font-family-generic", "modern")
-        font3.setAttribute("style:font-pitch", "fixed")
+        self.fontFaces = ooolibWriterContent.FontFaces(officeFonts)
+        self.fontFaces.addFont("Liberation Serif")
+        self.fontFaces.addFont("Liberation Sans")
+        self.fontFaces.addFont("Liberation Mono")
 
         #################
         # Office Styles #
@@ -63,7 +53,7 @@ class Styles:
         defaultParaProp = defaultStyle.addChild(ooolibXML.Element("style:paragraph-properties"))
         defaultParaProp.setAttribute("style:tab-stop-distance", "0.5in")
         defaultParaProp.setAttribute("style:writing-mode", "page")
-        defaultTextProp = defaultStyle.addChild(ooolibXML.Element("style:text-properties"))
+        self.defaultTextProp = defaultTextProp = defaultStyle.addChild(ooolibXML.Element("style:text-properties"))
         defaultTextProp.setAttribute("style:font-name", "Liberation Serif")
         defaultTextProp.setAttribute("fo:font-size", "12pt")
         defaultTextProp.setAttribute("fo:language", "en")
@@ -86,7 +76,7 @@ class Styles:
         headingParaProp.setAttribute("fo:margin-top", "0.165in")
         headingParaProp.setAttribute("fo:margin-bottom", "0.083in")
         headingParaProp.setAttribute("fo:keep-with-next", "always")
-        headingTextProp = styleHeading.addChild(ooolibXML.Element("style:text-properties"))
+        self.headingTextProp = headingTextProp = styleHeading.addChild(ooolibXML.Element("style:text-properties"))
         headingTextProp.setAttribute("style:font-name", "Liberation Sans")
         headingTextProp.setAttribute("fo:font-weight", "bold")
         headingTextProp.setAttribute("style:font-weight-asian", "bold")
@@ -168,6 +158,19 @@ class Styles:
         masterPage = officeMasterStyles.addChild(ooolibXML.Element("style:master-page"))
         masterPage.setAttribute("style:name", "Standard")
         masterPage.setAttribute("style:page-layout-name", "pm1")
+
+    def setDefaultFont(self, fontname=None, fontsize=None):
+        """Set the font (e.g. "DejaVu Sans") and/or size (e.g. "11pt") of the body text."""
+        if fontname is not None:
+            self.defaultTextProp.setAttribute("style:font-name", self.fontFaces.addFont(fontname))
+        if fontsize is not None:
+            self.defaultTextProp.setAttribute("fo:font-size", fontsize)
+            self.defaultTextProp.setAttribute("style:font-size-asian", fontsize)
+            self.defaultTextProp.setAttribute("style:font-size-complex", fontsize)
+
+    def setHeadingFont(self, fontname):
+        """Set the font used by every heading level."""
+        self.headingTextProp.setAttribute("style:font-name", self.fontFaces.addFont(fontname))
 
     def toString(self, indent=False):
         stylesString = self.prolog.toString()

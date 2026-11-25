@@ -77,6 +77,8 @@ class Meta:
     def updateStatistics(self):
         paragraphCount = self.global_object.getGlobalInt("paragraphCount")
         self.documentStatistic.setAttribute("meta:paragraph-count", paragraphCount)
+        tableCount = self.global_object.getGlobalInt("tableCount")
+        self.documentStatistic.setAttribute("meta:table-count", tableCount)
 
     def toString(self, indent=False):
         self.updateStatistics()

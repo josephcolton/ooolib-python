@@ -276,7 +276,8 @@ doc.content.addParagraph(text,
     indent=None,         # left indent, e.g. "0.5in"
     spaceBefore=None,    # e.g. "0.1in"
     spaceAfter=None,     # e.g. "0.1in"
-    keepWithNext=False)  # keep on the same page as the next paragraph
+    keepWithNext=False,  # keep on the same page as the next paragraph
+    fontname=None)       # e.g. "Liberation Sans", "DejaVu Serif"
 ```
 
 Formatting arguments apply to the entire paragraph. For mixed formatting, pass a list of runs instead of a string; each run is a string or a `(string, formatting)` tuple:
@@ -297,6 +298,47 @@ doc.content.endList()                                         # the next item st
 ```
 
 `addListItem` takes the same formatting arguments as `addParagraph` except `indent`. Items added one after another form one list; adding a paragraph or heading ends the list. Headings also accept a list of runs.
+
+### Fonts
+
+```python
+doc.content.addParagraph("Sans serif text.", fontname="Liberation Sans")
+doc.content.addParagraph(["Run ", ("print()", {"fontname": "Liberation Mono"}), " in code font."])
+doc.styles.setDefaultFont("Liberation Sans", "11pt")  # body text for the whole document
+doc.styles.setHeadingFont("Liberation Serif")         # every heading level
+```
+
+`fontname` works anywhere the other text formatting does: paragraphs, runs, list items, and table cells. Fonts are declared in the document automatically; a font that is not installed on the reader's computer is replaced by a similar one.
+
+### Tables
+
+```python
+# From a list of rows; the first row repeats at the top of each page
+doc.content.addTable([["Name", "Qty"],
+                      ["Apples", "3"]], headerRows=1)
+
+# Row by row, with column widths and formatting
+table = doc.content.addTable(columnWidths=["3in", "1in", "1.25in"], align="center")
+table.addRow(["Item", "Qty", "Price"], header=True, bold=True, background="#dddddd")
+table.addRow(["Widget", {"text": "2", "align": "right"}, {"text": "$10.00", "align": "right"}])
+table.addRow([{"text": "Total", "colspan": 2, "bold": True, "align": "right"}, "$44.50"])
+```
+
+The `addTable` signature in full:
+
+```python
+table = doc.content.addTable(data=None,  # optional list of rows to add right away
+    columns=None,        # number of columns (or taken from columnWidths / data)
+    columnWidths=None,   # e.g. ["2in", "1in"]; the table is as wide as their total
+    width=None,          # without columnWidths: total width, split evenly (default: margin to margin)
+    align=None,          # "left", "center", "right", or "margins"
+    headerRows=0,        # leading rows of data that repeat on each page
+    border="0.5pt solid #000000",  # None for no borders
+    padding="0.04in",    # space inside each cell
+    **formatting)        # cell formatting applied to every row in data
+```
+
+`table.addRow(cells, header=False, **formatting)` adds a row. Each cell is a string, a list of runs, or a dictionary with `"text"` plus formatting for that cell alone. Cell formatting is `bold`, `italic`, `underline`, `fontsize`, `fontcolor`, `fontname`, `align`, `background` (e.g. `"#dddddd"`), and `valign` (`"top"`, `"middle"`, `"bottom"`); a cell dictionary may also have `colspan`. Short rows are filled with empty cells. Header rows must be added before the other rows.
 
 The default page layout is US Letter (8.5″ × 11″) with 1″ top/bottom and 1.25″ left/right margins. The default body font is Liberation Serif 12pt.
 
@@ -715,6 +757,8 @@ python calc-example06.py    # cell alignment (vertical and horizontal)
 python calc-example07.py    # formulas (AVERAGE, MIN, MAX, SUM, SQRT, custom)
 python calc-example08.py    # predefined named styles
 python writer-example01.py  # headings, paragraphs, text formatting
+python writer-example02.py  # lists, paragraph layout, mixed formatting
+python writer-example03.py  # tables and font selection
 python impress-example01.py # slides, titles, content text, background colors
 python impress-example02.py # widescreen slides, layouts, shapes, connectors, groups, and images
 python draw-example01.py    # rectangles, ellipses, lines, text boxes
