@@ -164,12 +164,21 @@ class WriterTest(helpers.DocumentTestCase):
         doc.content.addParagraph("Mono", fontname="Liberation Mono")
         doc.content.addParagraph(["Plain ", ("custom", {"fontname": "My Font"}), " text"])
         doc.content.addListItem("Item", fontname="Liberation Mono")
+        doc.content.addHeading("Heading", level=2, fontname="Liberation Mono")
+        doc.content.addHeading("Plain heading", level=3)
         filename = self.export(doc, "fonts.odt")
-        self.assertEqual(ooolib.openDocument(filename).getText(), "Mono\nPlain custom text\nItem")
+        self.assertEqual(ooolib.openDocument(filename).getText(),
+                         "Mono\nPlain custom text\nItem\nHeading\nPlain heading")
         content = self.readZipString(filename, "content.xml")
         # Each font is declared once, and both paragraphs share one style
         self.assertEqual(content.count('<style:font-face style:name="Liberation Mono"'), 1)
-        self.assertEqual(content.count('style:font-name="Liberation Mono"'), 1)
+        self.assertEqual(content.count('style:font-name="Liberation Mono"'), 2)
+        # The heading style builds on its heading level; plain headings use the level directly
+        self.assertRegex(content, r'<style:style style:name="(P\d+)" style:family="paragraph" '
+                                  r'style:parent-style-name="Heading_20_2"><style:text-properties '
+                                  r'style:font-name="Liberation Mono"/></style:style>')
+        self.assertRegex(content, r'<text:h text:style-name="P\d+" text:outline-level="2">Heading</text:h>')
+        self.assertIn('<text:h text:style-name="Heading_20_3" text:outline-level="3">Plain heading</text:h>', content)
         self.assertIn('<style:font-face style:name="My Font" svg:font-family="&apos;My Font&apos;"/>', content)
         self.assertIn('<style:text-properties style:font-name="My Font"/>', content)
         styles = self.readZipString(filename, "styles.xml")

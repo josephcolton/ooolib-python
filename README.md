@@ -250,6 +250,7 @@ doc.content.addHeading("Document Title", level=1)
 doc.content.addHeading("Chapter One", level=2)
 doc.content.addHeading("Section 1.1", level=3)
 doc.content.addHeading("Sub-section", level=4)
+doc.content.addHeading("Appendix", level=2, fontname="Liberation Mono")  # font for this heading only
 
 # Paragraphs with optional formatting
 doc.content.addParagraph("Plain paragraph text.")
@@ -308,7 +309,7 @@ doc.styles.setDefaultFont("Liberation Sans", "11pt")  # body text for the whole 
 doc.styles.setHeadingFont("Liberation Serif")         # every heading level
 ```
 
-`fontname` works anywhere the other text formatting does: paragraphs, runs, list items, and table cells. Fonts are declared in the document automatically; a font that is not installed on the reader's computer is replaced by a similar one.
+`fontname` works anywhere the other text formatting does: paragraphs, headings, runs, list items, and table cells. Fonts are declared in the document automatically; a font that is not installed on the reader's computer is replaced by a similar one.
 
 ### Tables
 

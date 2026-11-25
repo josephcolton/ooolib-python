@@ -15,6 +15,7 @@ doc.styles.setHeadingFont("Liberation Serif")
 
 # Font selection on paragraphs and runs
 doc.content.addHeading("Fonts", level=2)
+doc.content.addHeading("A heading in a monospaced font", level=3, fontname="Liberation Mono")
 doc.content.addParagraph("This paragraph uses Liberation Serif.", fontname="Liberation Serif")
 doc.content.addParagraph(["Inline code such as ", ("print('hello')", {"fontname": "Liberation Mono"}),
                           " can use a monospaced font."])

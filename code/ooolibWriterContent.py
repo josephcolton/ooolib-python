@@ -97,12 +97,14 @@ class Content:
                                       spaceBefore=spaceBefore, spaceAfter=spaceAfter, keepWithNext=keepWithNext)
         return self.createParagraph(self.officeText, text, paraData)
 
-    def addHeading(self, text, level=1):
-        """Add a heading at the given level (1-4).  text may also be a list of runs."""
+    def addHeading(self, text, level=1, fontname=None):
+        """Add a heading at the given level (1-4).  text may also be a list of runs.
+        fontname sets the font of this heading only (see Styles.setHeadingFont)."""
         self.endList()
         self.paragraphCount += 1
         level = max(1, min(4, int(level)))
-        styleName = "Heading_20_%d" % level
+        styleName = self.automaticStylesInstance.getParagraphStyle(
+            self.paragraphData(fontname=fontname), parent="Heading_20_%d" % level)
         heading = self.officeText.addChild(ooolibXML.Element("text:h"))
         heading.setAttribute("text:style-name", styleName)
         heading.setAttribute("text:outline-level", str(level))
@@ -413,14 +415,14 @@ class AutomaticStyles:
                 return True
         return False
 
-    def getParagraphStyle(self, paraData=None):
-        # Paragraphs without formatting use the Standard style
+    def getParagraphStyle(self, paraData=None, parent="Standard"):
+        # Paragraphs without formatting use the parent style directly
         if not self.hasData(paraData, TEXT_KEYS + PARAGRAPH_KEYS):
-            return "Standard"
+            return parent
         # Build deduplication key
-        index = ("para",) + tuple(self.extractData(paraData, name) for name in TEXT_KEYS + PARAGRAPH_KEYS)
+        index = ("para", parent) + tuple(self.extractData(paraData, name) for name in TEXT_KEYS + PARAGRAPH_KEYS)
         if index not in self.styleObjects:
-            self.styleObjects[index] = self.createParagraphStyle(paraData)
+            self.styleObjects[index] = self.createParagraphStyle(paraData, parent)
         return self.styleObjects[index]
 
     def getTextStyle(self, textData=None):
@@ -530,13 +532,13 @@ class AutomaticStyles:
             self.styleObjects[index] = cellName
         return self.styleObjects[index]
 
-    def createParagraphStyle(self, paraData):
+    def createParagraphStyle(self, paraData, parent="Standard"):
         paraNum = self.global_object.incrementGlobalInt("automaticStyleWriterParagraph")
         paraName = "P%d" % paraNum
         styleObject = self.officeAutomaticStyles.addChild(ooolibXML.Element("style:style"))
         styleObject.setAttribute("style:name", paraName)
         styleObject.setAttribute("style:family", "paragraph")
-        styleObject.setAttribute("style:parent-style-name", "Standard")
+        styleObject.setAttribute("style:parent-style-name", parent)
         # Paragraph properties come before text properties
         if self.hasData(paraData, PARAGRAPH_KEYS):
             paraProp = styleObject.addChild(ooolibXML.Element("style:paragraph-properties"))
