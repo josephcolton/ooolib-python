@@ -15,7 +15,7 @@ import ooolibXML
 # Constants #
 #############
 TEXT_KEYS = ("bold", "italic", "underline", "fontsize", "fontcolor", "fontname")
-PARAGRAPH_KEYS = ("align", "indent", "spaceBefore", "spaceAfter", "keepWithNext")
+PARAGRAPH_KEYS = ("align", "indent", "spaceBefore", "spaceAfter", "keepWithNext", "pageBreakBefore")
 ALIGNMENTS = {"left": "start", "start": "start", "center": "center",
               "right": "end", "end": "end", "justify": "justify"}
 MAX_LIST_LEVEL = 10
@@ -37,6 +37,8 @@ class Content:
         self.global_object = global_object
         self.paragraphCount = 0
         self.tableCount = 0
+        # Set by addPageBreak(): the next paragraph, heading, list item, or table starts a new page
+        self.pageBreakPending = False
         # Open lists, outermost first, and whether each list level is numbered
         self.listStack = []
         self.listLevels = []
@@ -94,7 +96,8 @@ class Content:
         self.endList()
         paraData = self.paragraphData(bold=bold, italic=italic, underline=underline, fontsize=fontsize,
                                       fontcolor=fontcolor, fontname=fontname, align=align, indent=indent,
-                                      spaceBefore=spaceBefore, spaceAfter=spaceAfter, keepWithNext=keepWithNext)
+                                      spaceBefore=spaceBefore, spaceAfter=spaceAfter, keepWithNext=keepWithNext,
+                                      pageBreakBefore=self.takePageBreak())
         return self.createParagraph(self.officeText, text, paraData)
 
     def addHeading(self, text, level=1, fontname=None):
@@ -104,7 +107,8 @@ class Content:
         self.paragraphCount += 1
         level = max(1, min(4, int(level)))
         styleName = self.automaticStylesInstance.getParagraphStyle(
-            self.paragraphData(fontname=fontname), parent="Heading_20_%d" % level)
+            self.paragraphData(fontname=fontname, pageBreakBefore=self.takePageBreak()),
+            parent="Heading_20_%d" % level)
         heading = self.officeText.addChild(ooolibXML.Element("text:h"))
         heading.setAttribute("text:style-name", styleName)
         heading.setAttribute("text:outline-level", str(level))
@@ -149,12 +153,30 @@ class Content:
         current["item"] = current["list"].addChild(ooolibXML.Element("text:list-item"))
         paraData = self.paragraphData(bold=bold, italic=italic, underline=underline, fontsize=fontsize,
                                       fontcolor=fontcolor, fontname=fontname, align=align,
-                                      spaceBefore=spaceBefore, spaceAfter=spaceAfter, keepWithNext=keepWithNext)
+                                      spaceBefore=spaceBefore, spaceAfter=spaceAfter, keepWithNext=keepWithNext,
+                                      pageBreakBefore=self.takePageBreak())
         return self.createParagraph(current["item"], text, paraData)
 
     def endList(self):
         """Finish the current list, if any."""
         self.listStack = []
+
+    def addPageBreak(self):
+        """Start a new page.  The next paragraph, heading, list item, or table begins
+        at the top of the next page.  A list continues across the break; call endList()
+        as well to start a new one."""
+        self.pageBreakPending = True
+
+    def takePageBreak(self):
+        """Return True, once, if a page break is waiting for the next block."""
+        pending = self.pageBreakPending
+        self.pageBreakPending = False
+        return pending
+
+    def finishPageBreak(self):
+        """A page break with nothing after it still ends the page with an empty paragraph."""
+        if self.pageBreakPending:
+            self.addParagraph("")
 
     def addTable(self, data=None, columns=None, columnWidths=None, width=None, align=None,
                  headerRows=0, border=DEFAULT_BORDER, padding=DEFAULT_PADDING, **formatting):
@@ -209,7 +231,8 @@ class Content:
         tableElement = self.officeText.addChild(ooolibXML.Element("table:table"))
         tableElement.setAttribute("table:name", tableName)
         tableElement.setAttribute("table:style-name",
-                                  self.automaticStylesInstance.getTableStyle(sum(widths), str(align).lower()))
+                                  self.automaticStylesInstance.getTableStyle(sum(widths), str(align).lower(),
+                                                                             self.takePageBreak()))
         for inches in widths:
             column = tableElement.addChild(ooolibXML.Element("table:table-column"))
             column.setAttribute("table:style-name", self.automaticStylesInstance.getColumnStyle(inches))
@@ -257,10 +280,12 @@ class Content:
     # XML Generation #
     ##################
     def updateStats(self):
+        self.finishPageBreak()
         self.global_object.setGlobalInt("paragraphCount", self.paragraphCount)
         self.global_object.setGlobalInt("tableCount", self.tableCount)
 
     def toString(self, indent=False):
+        self.finishPageBreak()
         contentString = self.prolog.toString()
         contentString += self.documentContent.toString(indent)
         return contentString
@@ -469,8 +494,8 @@ class AutomaticStyles:
             self.styleObjects[index] = listName
         return self.styleObjects[index]
 
-    def getTableStyle(self, widthInches, align):
-        index = ("table", round(widthInches, 4), align)
+    def getTableStyle(self, widthInches, align, pageBreakBefore=False):
+        index = ("table", round(widthInches, 4), align, bool(pageBreakBefore))
         if index not in self.styleObjects:
             tableNum = self.global_object.incrementGlobalInt("automaticStyleWriterTable")
             tableName = "Tb%d" % tableNum
@@ -480,6 +505,8 @@ class AutomaticStyles:
             tableProp = styleObject.addChild(ooolibXML.Element("style:table-properties"))
             tableProp.setAttribute("style:width", ooolibUnits.formatLength(widthInches))
             tableProp.setAttribute("table:align", align)
+            if pageBreakBefore:
+                tableProp.setAttribute("fo:break-before", "page")
             self.styleObjects[index] = tableName
         return self.styleObjects[index]
 
@@ -556,6 +583,8 @@ class AutomaticStyles:
                 paraProp.setAttribute("fo:margin-bottom", spaceAfter)
             if self.extractData(paraData, "keepWithNext"):
                 paraProp.setAttribute("fo:keep-with-next", "always")
+            if self.extractData(paraData, "pageBreakBefore"):
+                paraProp.setAttribute("fo:break-before", "page")
         self.addTextProperties(styleObject, paraData)
         return paraName
 

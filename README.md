@@ -300,6 +300,16 @@ doc.content.endList()                                         # the next item st
 
 `addListItem` takes the same formatting arguments as `addParagraph` except `indent`. Items added one after another form one list; adding a paragraph or heading ends the list. Headings also accept a list of runs.
 
+### Page Breaks
+
+```python
+doc.content.addParagraph("End of chapter one.")
+doc.content.addPageBreak()
+doc.content.addHeading("Chapter Two", level=1)  # starts at the top of a new page
+```
+
+The next paragraph, heading, list item, or table after `addPageBreak()` begins on a new page. A list continues across the break unless `endList()` is called too.
+
 ### Fonts
 
 ```python
@@ -759,7 +769,7 @@ python calc-example07.py    # formulas (AVERAGE, MIN, MAX, SUM, SQRT, custom)
 python calc-example08.py    # predefined named styles
 python writer-example01.py  # headings, paragraphs, text formatting
 python writer-example02.py  # lists, paragraph layout, mixed formatting
-python writer-example03.py  # tables and font selection
+python writer-example03.py  # tables, font selection, and page breaks
 python impress-example01.py # slides, titles, content text, background colors
 python impress-example02.py # widescreen slides, layouts, shapes, connectors, groups, and images
 python draw-example01.py    # rectangles, ellipses, lines, text boxes

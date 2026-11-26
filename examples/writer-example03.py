@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Writer Example 03 - Demonstrates tables and font selection
+# Writer Example 03 - Demonstrates tables, font selection, and page breaks
 
 import sys
 sys.path.append('../code')
@@ -34,6 +34,9 @@ table.addRow(["Widget", {"text": "2", "align": "right"}, {"text": "$10.00", "ali
 table.addRow(["Gadget", {"text": "1", "align": "right"}, {"text": "$24.50", "align": "right"}])
 table.addRow([{"text": "Total", "colspan": 2, "bold": True, "align": "right"},
               {"text": "$44.50", "bold": True, "align": "right", "fontcolor": "#cc0000"}])
+
+# Start the next section on a new page
+doc.content.addPageBreak()
 
 # A borderless table, useful for layout
 doc.content.addHeading("Borderless Table", level=2)

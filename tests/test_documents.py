@@ -186,6 +186,35 @@ class WriterTest(helpers.DocumentTestCase):
         self.assertIn('style:font-name="DejaVu Sans" fo:font-size="11pt"', styles)
         self.assertIn('style:font-name="DejaVu Serif"', styles)
 
+    def test_page_breaks(self):
+        doc = ooolib.Writer()
+        doc.content.addParagraph("Page one")
+        doc.content.addPageBreak()
+        doc.content.addHeading("Page two", level=2)
+        doc.content.addListItem("Item one")
+        doc.content.addPageBreak()
+        doc.content.addListItem("Item two")
+        doc.content.addPageBreak()
+        doc.content.addTable([["Cell"]])
+        doc.content.addPageBreak()
+        filename = self.export(doc, "breaks.odt")
+        self.assertEqual(ooolib.openDocument(filename).getText(), "Page one\nPage two\nItem one\nItem two\nCell\n")
+        content = self.readZipString(filename, "content.xml")
+        # One style for the heading, one shared by the list item and the trailing
+        # empty paragraph, and one for the table
+        self.assertEqual(content.count('fo:break-before="page"'), 3)
+        self.assertEqual(len(re.findall(r'<text:(?:p|h) text:style-name="P\d+"', content)), 3)
+        self.assertRegex(content, r'<style:style style:name="P\d+" style:family="paragraph" '
+                                  r'style:parent-style-name="Heading_20_2"><style:paragraph-properties '
+                                  r'fo:break-before="page"/>')
+        self.assertRegex(content, r'<style:table-properties [^>]*fo:break-before="page"/>')
+        self.assertIn('<text:p text:style-name="Standard">Page one</text:p>', content)
+        # Both items stay in one list
+        self.assertEqual(content.count("<text:list "), 1)
+        # Only the next block gets the break, and the last break is only added once
+        self.assertEqual(content.count("Item one</text:p>"), 1)
+        self.assertEqual(doc.content.toString(), content)
+
     def test_table_round_trip(self):
         doc = ooolib.Writer()
         doc.content.addParagraph("Before")
